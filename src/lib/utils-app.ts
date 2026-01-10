@@ -1,126 +1,151 @@
 export async function scrapeProductInfo(url: string) {
-    try {
-        // Switch to a different CORS proxy that might be more reliable for localhost
-        // Using corsproxy.io instead of allorigins.win
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`
-        const response = await fetch(proxyUrl)
+    // List of CORS proxies to try
+    const proxies = [
+        (u: string) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+        (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+        (u: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`
+    ]
 
-        if (!response.ok) throw new Error(`Failed to fetch product page: ${response.statusText}`)
+    for (const getProxyUrl of proxies) {
+        try {
+            const proxyUrl = getProxyUrl(url)
+            const response = await fetch(proxyUrl, {
+                // allorigins needs no-cache sometimes to avoid stale 403s
+                cache: 'no-store'
+            })
 
-        const html = await response.text()
+            if (!response.ok) continue // Try next proxy
 
-        // Create a temporary document to parse the HTML
-        const parser = new DOMParser()
-        const doc = parser.parseFromString(html, 'text/html')
-
-        // 1. Extract Name
-        let name = doc.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
-            doc.querySelector('meta[name="twitter:title"]')?.getAttribute('content') ||
-            doc.querySelector('h1')?.textContent?.trim() ||
-            doc.title ||
-            ''
-
-        // Clean up name (remove site name suffixes like "Amazon.co.uk:")
-        if (name.includes(':')) {
-            const parts = name.split(':')
-            if (parts.length > 1 && parts[0].toLowerCase().includes('amazon')) {
-                name = parts.slice(1).join(':').trim()
+            let html = ''
+            if (proxyUrl.includes('allorigins.win')) {
+                const data = await response.json()
+                html = data.contents
+            } else {
+                html = await response.text()
             }
-        }
-        name = name.split('|')[0].split('-')[0].trim()
 
-        // 2. Extract Price & Currency
-        let price: number | null = null
-        let currency = 'USD'
+            if (!html || html.length < 100) continue
 
-        // Try meta tags first
-        const priceMeta = doc.querySelector('meta[property="product:price:amount"]') ||
-            doc.querySelector('meta[property="og:price:amount"]') ||
-            doc.querySelector('meta[name="twitter:data1"]')
+            // Basic check for anti-bot pages
+            if (html.includes('api-services-support@amazon.com') || html.includes('captcha')) {
+                console.warn('Scraper: Blocked by bot protection on this proxy')
+                continue
+            }
 
-        const currencyMeta = doc.querySelector('meta[property="product:price:currency"]') ||
-            doc.querySelector('meta[property="og:price:currency"]')
+            // Create a temporary document to parse the HTML
+            const parser = new DOMParser()
+            const doc = parser.parseFromString(html, 'text/html')
 
-        if (priceMeta) {
-            const priceStr = priceMeta.getAttribute('content') || ''
-            const num = parseFloat(priceStr.replace(/[^0-9.]/g, ''))
-            if (!isNaN(num)) price = num
-        }
+            // 1. Extract Name
+            let name = doc.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
+                doc.querySelector('meta[name="twitter:title"]')?.getAttribute('content') ||
+                doc.querySelector('h1')?.textContent?.trim() ||
+                doc.title ||
+                ''
 
-        if (currencyMeta) {
-            currency = currencyMeta.getAttribute('content') || 'USD'
-        }
+            // Clean up name
+            if (name.toLowerCase().includes('page not found')) {
+                name = ''
+            }
+            if (name.includes(':')) {
+                const parts = name.split(':')
+                if (parts.length > 1 && (parts[0].toLowerCase().includes('amazon') || parts[0].toLowerCase().includes('ebay'))) {
+                    name = parts.slice(1).join(':').trim()
+                }
+            }
+            name = name.split('|')[0].split('-')[0].trim()
 
-        // Fallback: If price not found in meta, look for common selectors
-        if (price === null) {
-            const priceSelectors = [
-                '.a-price .a-offscreen', // Amazon hidden price
-                '.a-price-whole', // Amazon visible whole
-                '#priceblock_ourprice',
-                '#priceblock_dealprice',
-                '#price_inside_buybox',
-                '.priceToPay',
-                '.pp-price',
-                '[class*="price-actual"]',
-                '[class*="price-item"]'
-            ]
+            // 2. Extract Price & Currency
+            let price: number | null = null
+            let currency = 'USD'
 
-            const pricePatterns = [
-                /\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?/,  // $1,234.56
-                /€\d{1,3}(?:\.\d{3})*(?:,\d{2})?/,   // €1.234,56
-                /£\d{1,3}(?:,\d{3})*(?:\.\d{2})?/,   // £1,234.56
-                /\d{1,3}(?:,\d{3})*(?:\.\d{2})?/      // just numbers
-            ]
+            // Try meta tags first
+            const priceMeta = doc.querySelector('meta[property="product:price:amount"]') ||
+                doc.querySelector('meta[property="og:price:amount"]') ||
+                doc.querySelector('meta[name="twitter:data1"]')
 
-            for (const selector of priceSelectors) {
-                const el = doc.querySelector(selector)
-                if (el) {
-                    const text = el.textContent || ''
-                    // Try to extract num from text directly first
-                    const num = parseFloat(text.replace(/[^0-9.]/g, ''))
-                    if (!isNaN(num) && num > 0) {
-                        price = num
-                        // Detect currency
-                        if (text.includes('$')) currency = 'USD'
-                        else if (text.includes('€')) currency = 'EUR'
-                        else if (text.includes('£')) currency = 'GBP'
-                        break
-                    }
+            const currencyMeta = doc.querySelector('meta[property="product:price:currency"]') ||
+                doc.querySelector('meta[property="og:price:currency"]')
 
-                    // Try patterns if direct parse fails
-                    for (const pattern of pricePatterns) {
-                        const match = text.match(pattern)
-                        if (match) {
-                            price = parseFloat(match[0].replace(/[^0-9.]/g, ''))
-                            if (match[0].includes('$')) currency = 'USD'
-                            else if (match[0].includes('€')) currency = 'EUR'
-                            else if (match[0].includes('£')) currency = 'GBP'
+            if (priceMeta) {
+                const priceStr = priceMeta.getAttribute('content') || ''
+                const num = parseFloat(priceStr.replace(/[^0-9.]/g, ''))
+                if (!isNaN(num)) price = num
+            }
+
+            if (currencyMeta) {
+                currency = currencyMeta.getAttribute('content') || 'USD'
+            }
+
+            // Fallback: If price not found in meta, look for common selectors
+            if (price === null) {
+                const priceSelectors = [
+                    '.a-price .a-offscreen',
+                    '.a-price-whole',
+                    '#priceblock_ourprice',
+                    '#priceblock_dealprice',
+                    '#price_inside_buybox',
+                    '.priceToPay',
+                    '.pp-price',
+                    '[class*="price-actual"]',
+                    '[class*="price-item"]'
+                ]
+
+                const pricePatterns = [
+                    /\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?/,
+                    /€\d{1,3}(?:\.\d{3})*(?:,\d{2})?/,
+                    /£\d{1,3}(?:,\d{3})*(?:\.\d{2})?/,
+                    /\d{1,3}(?:,\d{3})*(?:\.\d{2})?/
+                ]
+
+                for (const selector of priceSelectors) {
+                    const el = doc.querySelector(selector)
+                    if (el) {
+                        const text = el.textContent || ''
+                        const num = parseFloat(text.replace(/[^0-9.]/g, ''))
+                        if (!isNaN(num) && num > 0) {
+                            price = num
+                            if (text.includes('$')) currency = 'USD'
+                            else if (text.includes('€')) currency = 'EUR'
+                            else if (text.includes('£')) currency = 'GBP'
                             break
                         }
+
+                        for (const pattern of pricePatterns) {
+                            const match = text.match(pattern)
+                            if (match) {
+                                price = parseFloat(match[0].replace(/[^0-9.]/g, ''))
+                                if (match[0].includes('$')) currency = 'USD'
+                                else if (match[0].includes('€')) currency = 'EUR'
+                                else if (match[0].includes('£')) currency = 'GBP'
+                                break
+                            }
+                        }
                     }
+                    if (price !== null) break
                 }
-                if (price !== null) break
             }
-        }
 
-        // 3. Extract Image
-        const image = doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
-            doc.querySelector('meta[name="twitter:image"]')?.getAttribute('content') ||
-            doc.querySelector('#landingImage')?.getAttribute('src') ||
-            doc.querySelector('#imgBlkFront')?.getAttribute('src') ||
-            ''
+            // 3. Extract Image
+            const image = doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
+                doc.querySelector('meta[name="twitter:image"]')?.getAttribute('content') ||
+                doc.querySelector('#landingImage')?.getAttribute('src') ||
+                doc.querySelector('#imgBlkFront')?.getAttribute('src') ||
+                ''
 
-        return {
-            name,
-            price,
-            currency,
-            image,
-            url
+            // If we've got at least a name or price, return it
+            if (name || price) {
+                return { name, price, currency, image, url }
+            }
+        } catch (err) {
+            // Silence intermediate errors to keep console clean if rotation is intended
+            // console.debug(`Scraper: Proxy failed at ${getProxyUrl(url)}`, err)
+            continue
         }
-    } catch (err) {
-        console.error('Scraping error:', err)
-        return null
     }
+
+    console.error('Scraper: All proxies failed or were blocked')
+    return null
 }
 
 export function generateRandomUsername() {
