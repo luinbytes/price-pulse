@@ -1,10 +1,12 @@
+```
 import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from './lib/auth'
 import { Toaster } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ProductInput } from '@/components/product-input'
+import { PlusCircle } from 'lucide-react'
+import { generateRandomUsername } from '@/lib/utils-app'
 import { ProductList } from '@/components/product-list'
 import { ProductDetail } from '@/components/product-detail'
 import { Settings } from '@/components/settings'
@@ -69,6 +71,7 @@ function Dashboard() {
   const [profile, setProfile] = useState<UserProfile>({ username: null, avatar_url: null })
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
+  const [inputOpen, setInputOpen] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -102,6 +105,10 @@ function Dashboard() {
       .single()
 
     if (data) {
+      if (!data.username) {
+        // If no username set yet, we could auto-generate one here OR just rely on logic below
+        // But for consistency let's just use what's in DB
+      }
       setProfile({ username: data.username, avatar_url: data.avatar_url })
     }
   }
@@ -119,19 +126,39 @@ function Dashboard() {
     setRefreshTrigger(prev => prev + 1)
   }
 
-  const displayName = profile.username || user?.email?.split('@')[0] || 'User'
+  // Use random username generator or fallback to email handle
+  const randomName = useState(() => generateRandomUsername())[0]
+  const displayName = profile.username || randomName
 
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
       {/* Header */}
       <header className="border-b border-[#2A2A2A] bg-[#0A0A0A]/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-[#794A63] via-[#B3688A] to-[#FF9EB5] bg-clip-text text-transparent">
-            PricePulse
-          </h1>
+          <div className="flex items-center gap-6">
+            <h1 className="text-xl font-bold bg-gradient-to-r from-[#794A63] via-[#B3688A] to-[#FF9EB5] bg-clip-text text-transparent">
+              PricePulse
+            </h1>
+            <Button
+              onClick={() => setInputOpen(true)}
+              className="hidden sm:flex items-center gap-2 bg-[#FF9EB5] hover:bg-[#B3688A] text-black font-semibold h-9 px-4 rounded-full"
+            >
+              <PlusCircle className="w-4 h-4" />
+              Add Product
+            </Button>
+          </div>
+
           <div className="flex items-center gap-3">
-            {/* User Profile Display */}
-            <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setInputOpen(true)}
+              variant="outline"
+              size="icon"
+              className="sm:hidden border-[#3A3A3A] bg-transparent text-[#FF9EB5]"
+            >
+              <PlusCircle className="w-5 h-5" />
+            </Button>
+
+            <div className="flex items-center gap-2 pr-2 border-r border-[#2A2A2A]">
               {profile.avatar_url ? (
                 <img
                   src={profile.avatar_url}
@@ -139,17 +166,17 @@ function Dashboard() {
                   className="w-8 h-8 rounded-full object-cover border border-[#FF9EB5]"
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#794A63] to-[#FF9EB5] flex items-center justify-center text-sm font-bold text-white">
-                  {displayName[0].toUpperCase()}
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#794A63] to-[#FF9EB5] flex items-center justify-center text-sm font-bold text-white uppercase">
+                  {displayName[0]}
                 </div>
               )}
-              <span className="text-sm text-[#EDEDED] font-medium hidden sm:block">{displayName}</span>
+              <span className="text-sm text-[#EDEDED] font-medium hidden md:block">{displayName}</span>
             </div>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={signOut}
-              className="border-[#3A3A3A] bg-transparent hover:bg-[#2A2A2A] text-[#EDEDED]"
+              className="text-[#9CA3AF] hover:text-[#EDEDED] hover:bg-[#2A2A2A]"
             >
               Sign Out
             </Button>
@@ -173,12 +200,6 @@ function Dashboard() {
               className="text-[#9CA3AF] data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black"
             >
               Products
-            </TabsTrigger>
-            <TabsTrigger
-              value="add"
-              className="text-[#9CA3AF] data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black"
-            >
-              Add Product
             </TabsTrigger>
             <TabsTrigger
               value="settings"
@@ -225,17 +246,19 @@ function Dashboard() {
             />
           </TabsContent>
 
-          <TabsContent value="add" className="mt-6">
-            <ProductInput onProductAdded={handleProductAdded} />
-          </TabsContent>
-
           <TabsContent value="settings" className="mt-6">
             <Settings onProfileUpdate={fetchProfile} />
           </TabsContent>
         </Tabs>
       </main>
 
-      {/* Product Detail Modal */}
+      {/* Modals */}
+      <ProductInputModal
+        open={inputOpen}
+        onOpenChange={setInputOpen}
+        onProductAdded={handleProductAdded}
+      />
+
       <ProductDetail
         product={selectedProduct}
         open={detailOpen}
