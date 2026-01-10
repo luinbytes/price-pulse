@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -18,28 +18,19 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
     const [products, setProducts] = useState<Product[]>([])
     const [loading, setLoading] = useState(true)
 
-    useEffect(() => {
-        if (user) {
-            fetchProducts()
-        }
-    }, [user, refreshTrigger])
 
-    // Background scraping handler
-    useEffect(() => {
-        const scrapingProducts = products.filter(p => p.status === 'scraping')
-        if (scrapingProducts.length > 0) {
-            scrapingProducts.forEach(product => {
-                handleBackgroundScrape(product)
-            })
-        }
-    }, [products])
-
-    const handleBackgroundScrape = async (product: Product) => {
-        // Prevent multiple simultaneous scrapes for the same product in one session if possible
-        // (Simple guard: only run if we haven't already started it in this component instance)
+    const handleBackgroundScrape = useCallback(async (product: Product) => {
         try {
+            // Fetch user's default currency for fallback
+            const { data: settings } = await supabase
+                .from('user_settings')
+                .select('default_currency')
+                .eq('id', product.user_id)
+                .single()
+
+            const defaultCurrency = settings?.default_currency || 'USD'
             const { scrapeProductInfo } = await import('@/lib/utils-app')
-            const info = await scrapeProductInfo(product.url!)
+            const info = await scrapeProductInfo(product.url!, defaultCurrency)
 
             if (info && info.name && info.price !== null) {
                 const { error } = await supabase
@@ -77,12 +68,22 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
                     prev.map(p => p.id === product.id ? { ...p, status: 'failed' } : p)
                 )
             }
-        } catch (err) {
-            console.error('Background scrape failed:', err)
+        } catch {
+            // Ignore background error
         }
-    }
+    }, []) // supabase removed from deps
 
-    const fetchProducts = async () => {
+    // Background scraping handler
+    useEffect(() => {
+        const scrapingProducts = products.filter(p => p.status === 'scraping')
+        if (scrapingProducts.length > 0) {
+            scrapingProducts.forEach(product => {
+                handleBackgroundScrape(product)
+            })
+        }
+    }, [products, handleBackgroundScrape])
+
+    const fetchProducts = useCallback(async () => {
         if (!user) return
 
         setLoading(true)
@@ -95,13 +96,18 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
 
             if (error) throw error
             setProducts(data || [])
-        } catch (err) {
+        } catch {
             toast.error('Failed to load products')
-            console.error(err)
         } finally {
             setLoading(false)
         }
-    }
+    }, [user])
+
+    useEffect(() => {
+        if (user) {
+            fetchProducts()
+        }
+    }, [user, refreshTrigger, fetchProducts])
 
     const deleteProduct = async (id: string) => {
         try {
@@ -178,7 +184,7 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
                         >
                             <div className="flex-1">
                                 <div className="flex items-center gap-2">
-                                    <CardTitle className="text-sm font-semibold truncate group-hover:text-[#FF9EB5] transition-colors flex items-center gap-2">
+                                    <CardTitle className="text-sm font-semibold truncate group-hover:text-[#FF9EB5] transition-colors flex items-center gap-2 text-[#EDEDED]">
                                         {product.status === 'scraping' && <Loader2 className="w-4 h-4 text-[#FF9EB5] animate-spin" />}
                                         {product.status === 'failed' && <AlertCircle className="w-4 h-4 text-orange-400 shrink-0" />}
                                         {product.name}
@@ -210,6 +216,17 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
                                         {formatCurrency(product.current_price, product.currency)}
                                     </p>
                                 </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        onProductSelect?.(product)
+                                    }}
+                                    className="border-[#FF9EB5]/30 text-[#FF9EB5] hover:bg-[#FF9EB5]/10 h-8 px-3 text-xs"
+                                >
+                                    Compare
+                                </Button>
                                 <Button
                                     variant="ghost"
                                     size="sm"

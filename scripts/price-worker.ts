@@ -72,7 +72,17 @@ async function scrapePrice(url: string): Promise<{ price: number; currency: stri
     }
 }
 
-async function sendDiscordNotification(webhookUrl: string, product: any, oldPrice: number, newPrice: number) {
+interface ScrapedProduct {
+    id: string;
+    user_id: string;
+    name: string;
+    url: string;
+    current_price: number;
+    currency: string;
+    image_url?: string;
+}
+
+async function sendDiscordNotification(webhookUrl: string, product: ScrapedProduct, oldPrice: number, newPrice: number) {
     const diff = oldPrice - newPrice
     const percent = ((diff / oldPrice) * 100).toFixed(1)
 

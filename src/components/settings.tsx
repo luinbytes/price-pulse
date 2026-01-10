@@ -26,15 +26,8 @@ export function Settings({ onProfileUpdate }: SettingsProps) {
     const [checkFrequency, setCheckFrequency] = useState('hourly')
     const [defaultCurrency, setDefaultCurrency] = useState('USD')
 
-    useEffect(() => {
-        if (user) {
-            fetchSettings()
-        }
-    }, [user])
-
-    const fetchSettings = async () => {
+    const fetchSettings = useCallback(async () => {
         if (!user) return
-
         setLoading(true)
         try {
             const { data, error } = await supabase
@@ -43,21 +36,26 @@ export function Settings({ onProfileUpdate }: SettingsProps) {
                 .eq('id', user.id)
                 .single()
 
-            if (error && error.code !== 'PGRST116') throw error
-
+            if (error) throw error
             if (data) {
                 setUsername(data.username || '')
                 setAvatarUrl(data.avatar_url || '')
                 setDiscordWebhook(data.discord_webhook || '')
-                setCheckFrequency(data.check_frequency || 'hourly')
+                setCheckFrequency(data.check_frequency || '6h')
                 setDefaultCurrency(data.default_currency || 'USD')
             }
-        } catch (err) {
-            console.error('Failed to load settings:', err)
+        } catch {
+            toast.error('Failed to load settings')
         } finally {
             setLoading(false)
         }
-    }
+    }, [user])
+
+    useEffect(() => {
+        if (user) {
+            fetchSettings()
+        }
+    }, [user, fetchSettings])
 
     const saveSettings = async () => {
         if (!user) return

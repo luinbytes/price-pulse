@@ -7,7 +7,17 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import type { Product } from '@/lib/database.types'
+import { searchProductPrices } from '@/lib/utils-app'
+
+interface ComparisonResult {
+    store: string
+    url: string
+    price: number | null
+    currency: string
+    icon: string
+}
 
 interface ProductDetailProps {
     product: Product | null
@@ -24,7 +34,7 @@ interface PriceHistoryItem {
     recorded_at: string
 }
 
-export function ProductDetail({ product, open, onClose, onDelete }: ProductDetailProps) {
+export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: ProductDetailProps) {
     const [priceHistory, setPriceHistory] = useState<PriceHistoryItem[]>([])
     const [loading, setLoading] = useState(false)
 
@@ -33,6 +43,43 @@ export function ProductDetail({ product, open, onClose, onDelete }: ProductDetai
     const [editedPrice, setEditedPrice] = useState('')
     const [editedCurrency, setEditedCurrency] = useState('USD')
 
+    const [comparisonResults, setComparisonResults] = useState<ComparisonResult[]>([])
+    const [comparisonLoading, setComparisonLoading] = useState(false)
+
+    const fetchPriceHistory = useCallback(async () => {
+        if (!product) return
+
+        setLoading(true)
+        try {
+            const { data, error } = await supabase
+                .from('price_history')
+                .select('*')
+                .eq('product_id', product.id)
+                .order('recorded_at', { ascending: false })
+                .limit(10)
+
+            if (error) throw error
+            setPriceHistory(data || [])
+        } catch {
+            console.error('Failed to load price history')
+        } finally {
+            setLoading(false)
+        }
+    }, [product])
+
+    const fetchComparison = useCallback(async () => {
+        if (!product) return
+        setComparisonLoading(true)
+        try {
+            const results = await searchProductPrices(product.name)
+            setComparisonResults(results)
+        } catch {
+            console.error('Failed to fetch comparison prices')
+        } finally {
+            setComparisonLoading(false)
+        }
+    }, [product])
+
     useEffect(() => {
         if (product && open) {
             fetchPriceHistory()
@@ -40,8 +87,9 @@ export function ProductDetail({ product, open, onClose, onDelete }: ProductDetai
             setEditedPrice(product.current_price?.toString() || '0')
             setEditedCurrency(product.currency || 'USD')
             setIsEditing(false)
+            fetchComparison()
         }
-    }, [product, open])
+    }, [product, open, fetchPriceHistory, fetchComparison])
 
     const handleUpdate = async () => {
         if (!product) return
@@ -71,29 +119,8 @@ export function ProductDetail({ product, open, onClose, onDelete }: ProductDetai
             toast.success('Product updated')
             onUpdate?.(updatedProduct)
             setIsEditing(false)
-        } catch (err) {
+        } catch {
             toast.error('Failed to update product')
-        }
-    }
-
-    const fetchPriceHistory = async () => {
-        if (!product) return
-
-        setLoading(true)
-        try {
-            const { data, error } = await supabase
-                .from('price_history')
-                .select('*')
-                .eq('product_id', product.id)
-                .order('recorded_at', { ascending: false })
-                .limit(10)
-
-            if (error) throw error
-            setPriceHistory(data || [])
-        } catch (err) {
-            console.error('Failed to load price history:', err)
-        } finally {
-            setLoading(false)
         }
     }
 
@@ -111,8 +138,21 @@ export function ProductDetail({ product, open, onClose, onDelete }: ProductDetai
             toast.success('Product deleted')
             onDelete?.()
             onClose()
-        } catch (err) {
+        } catch {
             toast.error('Failed to delete product')
+        }
+    }
+
+    const fetchComparison = async () => {
+        if (!product) return
+        setComparisonLoading(true)
+        try {
+            const results = await searchProductPrices(product.name)
+            setComparisonResults(results)
+        } catch (_err) {
+            console.error('Failed to fetch comparison prices:', _err)
+        } finally {
+            setComparisonLoading(false)
         }
     }
 
@@ -137,15 +177,25 @@ export function ProductDetail({ product, open, onClose, onDelete }: ProductDetai
         return { change, percentChange, isDown: change < 0 }
     }
 
-    const priceChange = getPriceChangeInfo()
+    const getComparisonLinks = (name: string) => {
+        const query = encodeURIComponent(name)
+        return [
+            { name: 'Amazon', url: `https://www.amazon.com/s?k=${query}`, icon: '📦' },
+            { name: 'eBay', url: `https://www.ebay.com/sch/i.html?_nkw=${query}`, icon: '🏷️' },
+            { name: 'Google', url: `https://www.google.com/search?tbm=shop&q=${query}`, icon: '🔍' }
+        ]
+    }
 
     if (!product) return null
+
+    const priceChange = getPriceChangeInfo()
+    const comparisonLinks = getComparisonLinks(product.name)
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
             <DialogContent className="bg-[#1A1A1A] border-[#2A2A2A] text-[#EDEDED] max-w-lg">
                 <DialogHeader>
-                    <DialogTitle className="text-xl font-bold text-[#EDEDED] pr-8 line-clamp-2">
+                    <DialogTitle className="text-xl font-bold text-[#EDEDED] pr-8 line-clamp-2 leading-tight">
                         {isEditing ? 'Edit Product Details' : product.name}
                     </DialogTitle>
                 </DialogHeader>
@@ -244,6 +294,93 @@ export function ProductDetail({ product, open, onClose, onDelete }: ProductDetai
                     {!isEditing && (
                         <>
                             {/* Price History */}
+                            {/* Price History Chart */}
+                            {priceHistory.length > 1 && (
+                                <div className="h-48 w-full bg-[#0A0A0A] p-2 rounded-lg border border-[#2A2A2A]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={[...priceHistory].reverse()}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" vertical={false} />
+                                            <XAxis
+                                                dataKey="recorded_at"
+                                                hide
+                                            />
+                                            <YAxis
+                                                hide
+                                                domain={['auto', 'auto']}
+                                            />
+                                            <Tooltip
+                                                contentStyle={{ backgroundColor: '#1A1A1A', border: '1px solid #2A2A2A', borderRadius: '8px' }}
+                                                labelStyle={{ display: 'none' }}
+                                                formatter={(value: any) => [formatCurrency(Number(value), product.currency), 'Price']}
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="price"
+                                                stroke="#FF9EB5"
+                                                strokeWidth={2}
+                                                dot={{ fill: '#FF9EB5', r: 4 }}
+                                                activeDot={{ r: 6, stroke: '#1A1A1A', strokeWidth: 2 }}
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            )}
+
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="text-sm font-semibold text-[#EDEDED]">Price Comparison</h3>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={fetchComparison}
+                                        disabled={comparisonLoading}
+                                        className="h-7 text-[10px] text-[#FF9EB5] hover:text-[#FF9EB5] hover:bg-[#FF9EB5]/10"
+                                    >
+                                        {comparisonLoading ? 'Searching...' : 'Refresh'}
+                                    </Button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {comparisonResults.length > 0 ? (
+                                        comparisonResults.map(link => (
+                                            <a
+                                                key={link.store}
+                                                href={link.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-3 p-3 rounded bg-[#0A0A0A] border border-[#2A2A2A] hover:border-[#FF9EB5] transition-colors group"
+                                            >
+                                                <span className="text-xl">{link.icon}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[10px] text-[#9CA3AF] font-medium leading-none mb-1">{link.store}</p>
+                                                    <p className="text-sm font-bold text-[#FF9EB5] truncate">
+                                                        {link.price ? formatCurrency(link.price, link.currency) : 'View Shop'}
+                                                    </p>
+                                                </div>
+                                            </a>
+                                        ))
+                                    ) : (
+                                        comparisonLinks.map(link => (
+                                            <a
+                                                key={link.name}
+                                                href={link.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex items-center gap-3 p-3 rounded bg-[#0A0A0A] border border-[#2A2A2A] hover:border-[#FF9EB5] transition-colors group"
+                                            >
+                                                <span className="text-xl">{link.icon}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[10px] text-[#9CA3AF] font-medium leading-none mb-1">{link.name}</p>
+                                                    <p className="text-sm font-bold text-[#FF9EB5] truncate">Check Price</p>
+                                                </div>
+                                            </a>
+                                        ))
+                                    )}
+                                </div>
+                                {comparisonLoading && (
+                                    <p className="text-[10px] text-center text-[#9CA3AF] mt-2 animate-pulse">Searching other stores for best deals...</p>
+                                )}
+                            </div>
+
                             <div>
                                 <h3 className="text-sm font-semibold text-[#EDEDED] mb-2">Price History</h3>
                                 {loading ? (
@@ -251,11 +388,11 @@ export function ProductDetail({ product, open, onClose, onDelete }: ProductDetai
                                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#FF9EB5]"></div>
                                     </div>
                                 ) : priceHistory.length > 0 ? (
-                                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                                        {priceHistory.map((item, index) => (
+                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                        {[...priceHistory].map((item, index) => (
                                             <div
                                                 key={item.id}
-                                                className="flex items-center justify-between text-sm p-2 rounded bg-[#0A0A0A]"
+                                                className="flex items-center justify-between text-sm p-2 rounded bg-[#0A0A0A] border border-[#2A2A2A]/50"
                                             >
                                                 <span className="text-[#9CA3AF] text-xs">{formatDate(item.recorded_at)}</span>
                                                 <span className={index === 0 ? 'text-[#FF9EB5] font-semibold' : 'text-[#EDEDED]'}>
@@ -271,10 +408,10 @@ export function ProductDetail({ product, open, onClose, onDelete }: ProductDetai
 
                             <Separator className="bg-[#2A2A2A]" />
 
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2 pt-2">
                                 <Button
                                     variant="outline"
-                                    className="flex-1 border-[#3A3A3A] bg-transparent hover:bg-[#2A2A2A] text-[#EDEDED]"
+                                    className="flex-1 min-w-[120px] border-[#3A3A3A] bg-transparent hover:bg-[#2A2A2A] text-[#EDEDED]"
                                     onClick={() => setIsEditing(true)}
                                 >
                                     Edit Details
@@ -282,15 +419,15 @@ export function ProductDetail({ product, open, onClose, onDelete }: ProductDetai
                                 {product.url && (
                                     <Button
                                         variant="outline"
-                                        className="flex-1 border-[#3A3A3A] bg-transparent hover:bg-[#2A2A2A] text-[#EDEDED]"
-                                        onClick={() => window.open(product.url!, '_blank')}
+                                        className="flex-1 min-w-[120px] border-[#3A3A3A] bg-transparent hover:bg-[#2A2A2A] text-[#EDEDED]"
+                                        onClick={() => window.open(product.url as string, '_blank')}
                                     >
                                         Visit Store
                                     </Button>
                                 )}
                                 <Button
                                     variant="outline"
-                                    className="border-red-500/50 bg-transparent hover:bg-red-500/10 text-red-400"
+                                    className="border-red-500/50 bg-transparent hover:bg-red-500/10 text-red-400 min-w-[80px]"
                                     onClick={handleDelete}
                                 >
                                     Delete

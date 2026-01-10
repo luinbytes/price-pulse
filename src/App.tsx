@@ -73,14 +73,7 @@ function Dashboard() {
   const [detailOpen, setDetailOpen] = useState(false)
   const [inputOpen, setInputOpen] = useState(false)
 
-  useEffect(() => {
-    if (user) {
-      fetchStats()
-      fetchProfile()
-    }
-  }, [user, refreshTrigger])
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     if (!user) return
 
     const { data: products } = await supabase
@@ -93,9 +86,9 @@ function Dashboard() {
       drops: 0,
       savings: 0
     })
-  }
+  }, [user])
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     if (!user) return
 
     const { data } = await supabase
@@ -107,7 +100,14 @@ function Dashboard() {
     if (data) {
       setProfile({ username: data.username, avatar_url: data.avatar_url })
     }
-  }
+  }, [user])
+
+  useEffect(() => {
+    if (user) {
+      fetchStats()
+      fetchProfile()
+    }
+  }, [user, refreshTrigger, fetchStats, fetchProfile])
 
   const handleProductAdded = () => {
     setRefreshTrigger(prev => prev + 1)
@@ -119,6 +119,12 @@ function Dashboard() {
   }
 
   const handleProductDeleted = () => {
+    setDetailOpen(false)
+    setRefreshTrigger(prev => prev + 1)
+  }
+
+  const handleProductUpdate = (updatedProduct: Product) => {
+    setSelectedProduct(updatedProduct)
     setRefreshTrigger(prev => prev + 1)
   }
 
@@ -260,6 +266,7 @@ function Dashboard() {
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
         onDelete={handleProductDeleted}
+        onUpdate={handleProductUpdate}
       />
     </div>
   )

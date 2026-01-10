@@ -6,8 +6,7 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
-import { scrapeProductInfo } from '@/lib/utils-app'
-import { Link as LinkIcon, Loader2, AlertCircle } from 'lucide-react'
+import { Link as LinkIcon, Loader2 } from 'lucide-react'
 
 interface ProductInputModalProps {
     open: boolean
@@ -19,22 +18,11 @@ export function ProductInputModal({ open, onOpenChange, onProductAdded }: Produc
     const { user } = useAuth()
     const [loading, setLoading] = useState(false)
     const [url, setUrl] = useState('')
-    const [scrapingStatus, setScrapingStatus] = useState<'idle' | 'scraping' | 'failed' | 'success'>('idle')
-
-    // Form data from scrape (hidden unless needed for manual entry)
-    const [scrapedData, setScrapedData] = useState<{
-        name: string
-        price: number
-        currency: string
-        image: string
-    } | null>(null)
 
     // Reset form on open/close
     useEffect(() => {
         if (!open) {
             setUrl('')
-            setScrapedData(null)
-            setScrapingStatus('idle')
             setLoading(false)
         }
     }, [open])
@@ -55,17 +43,17 @@ export function ProductInputModal({ open, onOpenChange, onProductAdded }: Produc
             try {
                 domain = new URL(url).hostname.replace('www.', '').split('.')[0]
                 domain = domain.charAt(0).toUpperCase() + domain.slice(1)
-            } catch (e) { /* ignore */ }
+            } catch { /* ignore */ }
 
             // Insert immediately with 'scraping' status
-            const { data, error } = await supabase.from('products').insert({
+            const { error } = await supabase.from('products').insert({
                 user_id: user.id,
                 name: `Scraping: ${domain}...`,
                 url: url,
                 current_price: 0,
                 currency: 'USD',
                 status: 'scraping'
-            }).select().single()
+            })
 
             if (error) throw error
 
@@ -73,9 +61,6 @@ export function ProductInputModal({ open, onOpenChange, onProductAdded }: Produc
             onProductAdded?.()
             onOpenChange(false)
 
-            // Trigger actual scraping in background (non-blocking for UI)
-            // Note: The UI refresh in App.tsx will handle showing the 'scraping' state.
-            // We'll let the parent or the item itself handle the background update logic.
         } catch (err) {
             toast.error('Failed to start tracking')
             console.error(err)
@@ -111,25 +96,6 @@ export function ProductInputModal({ open, onOpenChange, onProductAdded }: Produc
                                 />
                             </div>
                         </div>
-
-                        {scrapingStatus === 'scraping' && (
-                            <div className="space-y-3 py-2">
-                                <div className="flex items-center justify-between text-xs text-[#FF9EB5]">
-                                    <span className="animate-pulse">Analyzing page content...</span>
-                                    <span className="font-mono">Rotating proxies...</span>
-                                </div>
-                                <div className="h-1.5 w-full bg-[#0A0A0A] rounded-full overflow-hidden border border-[#2A2A2A]">
-                                    <div className="h-full bg-[#FF9EB5] transition-all duration-1000 ease-in-out animate-[shimmer_2s_infinite]" style={{ width: '70%' }}></div>
-                                </div>
-                            </div>
-                        )}
-
-                        {scrapingStatus === 'failed' && (
-                            <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm">
-                                <AlertCircle className="w-5 h-5 shrink-0" />
-                                <p>We couldn't extract details from this link. You'll need to update them manually in the dashboard.</p>
-                            </div>
-                        )}
                     </div>
 
                     <Button
@@ -140,7 +106,7 @@ export function ProductInputModal({ open, onOpenChange, onProductAdded }: Produc
                         {loading ? (
                             <div className="flex items-center gap-2">
                                 <Loader2 className="w-5 h-5 animate-spin" />
-                                <span>Scraping...</span>
+                                <span>Starting...</span>
                             </div>
                         ) : (
                             <div className="flex items-center gap-2">

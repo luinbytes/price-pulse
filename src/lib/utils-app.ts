@@ -1,4 +1,4 @@
-export async function scrapeProductInfo(url: string) {
+export async function scrapeProductInfo(url: string, defaultCurrency: string = 'USD') {
     // List of CORS proxies to try
     const proxies = [
         (u: string) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
@@ -60,7 +60,7 @@ export async function scrapeProductInfo(url: string) {
 
             // 2. Extract Price & Currency
             let price: number | null = null
-            let currency = 'USD'
+            let currency = defaultCurrency
 
             // Try meta tags first
             const priceMeta = doc.querySelector('meta[property="product:price:amount"]') ||
@@ -77,7 +77,17 @@ export async function scrapeProductInfo(url: string) {
             }
 
             if (currencyMeta) {
-                currency = currencyMeta.getAttribute('content') || 'USD'
+                currency = currencyMeta.getAttribute('content') || currency
+            } else {
+                // Secondary check: look for og:locale or lang attribute
+                const locale = doc.querySelector('meta[property="og:locale"]')?.getAttribute('content') ||
+                    doc.documentElement.lang || '';
+
+                if (locale.includes('GB') || url.includes('.co.uk')) currency = 'GBP';
+                else if (locale.includes('DE') || locale.includes('FR') || url.includes('.de') || url.includes('.fr')) currency = 'EUR';
+                else if (locale.includes('JP') || url.includes('.jp')) currency = 'JPY';
+                else if (locale.includes('CA') || url.includes('.ca')) currency = 'CAD';
+                else if (locale.includes('AU') || url.includes('.au')) currency = 'AUD';
             }
 
             // Fallback: If price not found in meta, look for common selectors
@@ -106,11 +116,14 @@ export async function scrapeProductInfo(url: string) {
                     if (el) {
                         const text = el.textContent || ''
                         const num = parseFloat(text.replace(/[^0-9.]/g, ''))
-                        if (!isNaN(num) && num > 0) {
+                        if (num > 0) {
                             price = num
                             if (text.includes('$')) currency = 'USD'
                             else if (text.includes('€')) currency = 'EUR'
                             else if (text.includes('£')) currency = 'GBP'
+                            else if (text.includes('C$')) currency = 'CAD'
+                            else if (text.includes('A$')) currency = 'AUD'
+                            else if (text.includes('¥')) currency = 'JPY'
                             break
                         }
 
@@ -140,15 +153,59 @@ export async function scrapeProductInfo(url: string) {
             if (name || price) {
                 return { name, price, currency, image, url }
             }
-        } catch (err) {
+        } catch {
             // Silence intermediate errors to keep console clean if rotation is intended
-            // console.debug(`Scraper: Proxy failed at ${getProxyUrl(url)}`, err)
             continue
         }
     }
 
     console.error('Scraper: All proxies failed or were blocked')
     return null
+}
+
+export async function searchProductPrices(query: string) {
+    const encodedQuery = encodeURIComponent(query)
+    const targets = [
+        {
+            name: 'Amazon',
+            url: `https://www.amazon.com/s?k=${encodedQuery}`,
+            priceSelector: '.a-price .a-offscreen',
+            icon: '📦'
+        },
+        {
+            name: 'eBay',
+            url: `https://www.ebay.com/sch/i.html?_nkw=${encodedQuery}`,
+            priceSelector: '.s-item__price',
+            icon: '🏷️'
+        }
+    ]
+
+    const results = []
+
+    for (const target of targets) {
+        // Try the same proxy rotation strategy
+        const info = await scrapeProductInfo(target.url)
+        if (info && info.price) {
+            results.push({
+                store: target.name,
+                url: target.url,
+                price: info.price,
+                currency: info.currency,
+                icon: target.icon
+            })
+        } else {
+            // If full scrape fails, at least provide the link
+            results.push({
+                store: target.name,
+                url: target.url,
+                price: null,
+                currency: 'USD',
+                icon: target.icon
+            })
+        }
+    }
+
+    return results
 }
 
 export function generateRandomUsername() {
