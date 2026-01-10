@@ -48,61 +48,37 @@ export function ProductInputModal({ open, onOpenChange, onProductAdded }: Produc
         }
 
         setLoading(true)
-        setScrapingStatus('scraping')
 
         try {
-            const info = await scrapeProductInfo(url)
+            // Get domain for a temporary name
+            let domain = 'Product'
+            try {
+                domain = new URL(url).hostname.replace('www.', '').split('.')[0]
+                domain = domain.charAt(0).toUpperCase() + domain.slice(1)
+            } catch (e) { /* ignore */ }
 
-            if (info && info.name && info.price !== null) {
-                // Success path
-                setScrapedData({
-                    name: info.name,
-                    price: info.price,
-                    currency: info.currency,
-                    image: info.image
-                })
+            // Insert immediately with 'scraping' status
+            const { data, error } = await supabase.from('products').insert({
+                user_id: user.id,
+                name: `Scraping: ${domain}...`,
+                url: url,
+                current_price: 0,
+                currency: 'USD',
+                status: 'scraping'
+            }).select().single()
 
-                const { error } = await supabase.from('products').insert({
-                    user_id: user.id,
-                    name: info.name,
-                    url: url,
-                    current_price: info.price,
-                    currency: info.currency,
-                    image_url: info.image || null
-                })
+            if (error) throw error
 
-                if (error) throw error
+            toast.info('Tracking started in background...')
+            onProductAdded?.()
+            onOpenChange(false)
 
-                setScrapingStatus('success')
-                toast.success('Found details! Product added.')
-                onProductAdded?.()
-                onOpenChange(false)
-            } else {
-                // Failure path - Mark as failed but add anyway so user can fix
-                setScrapingStatus('failed')
-
-                // Get domain for a better fallback name
-                let domain = 'Product'
-                try { domain = new URL(url).hostname.replace('www.', '') } catch (e) { /* ignore */ }
-
-                const { error } = await supabase.from('products').insert({
-                    user_id: user.id,
-                    name: `⚠️ Update: ${domain}`,
-                    url: url,
-                    current_price: 0,
-                    currency: 'USD',
-                })
-
-                if (error) throw error
-
-                toast.warning('Could not auto-fill details, but added to your list for manual update.')
-                onProductAdded?.()
-                onOpenChange(false)
-            }
+            // Trigger actual scraping in background (non-blocking for UI)
+            // Note: The UI refresh in App.tsx will handle showing the 'scraping' state.
+            // We'll let the parent or the item itself handle the background update logic.
         } catch (err) {
-            toast.error('Failed to add product')
+            toast.error('Failed to start tracking')
             console.error(err)
-            setScrapingStatus('failed')
         } finally {
             setLoading(false)
         }

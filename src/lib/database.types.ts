@@ -20,6 +20,7 @@ export interface Database {
                     currency: string
                     created_at: string
                     last_checked: string | null
+                    status: string | null
                 }
                 Insert: {
                     id?: string
@@ -28,9 +29,10 @@ export interface Database {
                     url?: string | null
                     image_url?: string | null
                     current_price?: number | null
-                    currency?: string
+                    currency?: string | null
                     created_at?: string
                     last_checked?: string | null
+                    status?: string | null
                 }
                 Update: {
                     id?: string
@@ -39,9 +41,10 @@ export interface Database {
                     url?: string | null
                     image_url?: string | null
                     current_price?: number | null
-                    currency?: string
+                    currency?: string | null
                     created_at?: string
                     last_checked?: string | null
+                    status?: string | null
                 }
             }
             price_history: {

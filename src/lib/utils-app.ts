@@ -36,8 +36,11 @@ export async function scrapeProductInfo(url: string) {
             const parser = new DOMParser()
             const doc = parser.parseFromString(html, 'text/html')
 
-            // 1. Extract Name
-            let name = doc.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
+            // 1. Extract Name - use more specific selectors for big sites
+            let name = doc.querySelector('#productTitle')?.textContent?.trim() || // Amazon
+                doc.querySelector('.product-title')?.textContent?.trim() || // eBay
+                doc.querySelector('h1.page-title')?.textContent?.trim() ||
+                doc.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
                 doc.querySelector('meta[name="twitter:title"]')?.getAttribute('content') ||
                 doc.querySelector('h1')?.textContent?.trim() ||
                 doc.title ||

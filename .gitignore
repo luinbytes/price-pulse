@@ -24,3 +24,8 @@ todo.md
 *.njsproj
 *.sln
 *.sw?
+schema_dump.sql
+.system_generated/
+.gemini/
+brain/
+history/

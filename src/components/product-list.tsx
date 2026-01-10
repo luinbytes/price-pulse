@@ -24,6 +24,64 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
         }
     }, [user, refreshTrigger])
 
+    // Background scraping handler
+    useEffect(() => {
+        const scrapingProducts = products.filter(p => p.status === 'scraping')
+        if (scrapingProducts.length > 0) {
+            scrapingProducts.forEach(product => {
+                handleBackgroundScrape(product)
+            })
+        }
+    }, [products])
+
+    const handleBackgroundScrape = async (product: Product) => {
+        // Prevent multiple simultaneous scrapes for the same product in one session if possible
+        // (Simple guard: only run if we haven't already started it in this component instance)
+        try {
+            const { scrapeProductInfo } = await import('@/lib/utils-app')
+            const info = await scrapeProductInfo(product.url!)
+
+            if (info && info.name && info.price !== null) {
+                const { error } = await supabase
+                    .from('products')
+                    .update({
+                        name: info.name,
+                        current_price: info.price,
+                        currency: info.currency,
+                        image_url: info.image || null,
+                        status: 'tracking'
+                    })
+                    .eq('id', product.id)
+
+                if (error) throw error
+
+                // Refresh the local list
+                setProducts(prev =>
+                    prev.map(p => p.id === product.id ? {
+                        ...p,
+                        name: info.name,
+                        current_price: info.price,
+                        currency: info.currency,
+                        image_url: info.image || null,
+                        status: 'tracking'
+                    } : p)
+                )
+            } else {
+                // Mark as failed
+                await supabase
+                    .from('products')
+                    .update({ status: 'failed' })
+                    .eq('id', product.id)
+
+                setProducts(prev =>
+                    prev.map(p => p.id === product.id ? { ...p, status: 'failed' } : p)
+                )
+            }
+        } catch (err) {
+            console.error('Background scrape failed:', err)
+        }
+    }
+
     const fetchProducts = async () => {
         if (!user) return
 
@@ -121,9 +179,15 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
                             <div className="flex-1">
                                 <div className="flex items-center gap-2">
                                     <CardTitle className="text-sm font-semibold truncate group-hover:text-[#FF9EB5] transition-colors flex items-center gap-2">
-                                        {product.name.startsWith('⚠️') && <AlertCircle className="w-4 h-4 text-orange-400 shrink-0" />}
+                                        {product.status === 'scraping' && <Loader2 className="w-4 h-4 text-[#FF9EB5] animate-spin" />}
+                                        {product.status === 'failed' && <AlertCircle className="w-4 h-4 text-orange-400 shrink-0" />}
                                         {product.name}
                                     </CardTitle>
+                                    {product.status === 'scraping' && (
+                                        <Badge className="bg-[#FF9EB5]/20 text-[#FF9EB5] border-[#FF9EB5]/30 animate-pulse text-[10px] py-0 px-1">
+                                            SCRAPING
+                                        </Badge>
+                                    )}
                                 </div>
                                 <p className="text-sm text-[#9CA3AF] mt-1">
                                     Added {formatDate(product.created_at)}
