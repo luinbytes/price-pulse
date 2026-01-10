@@ -164,13 +164,13 @@ export function ProductInput({ onProductAdded }: ProductInputProps) {
             <CardContent>
                 <Tabs defaultValue="url" className="w-full">
                     <TabsList className="grid w-full grid-cols-3 bg-[#0A0A0A] border border-[#2A2A2A]">
-                        <TabsTrigger value="url" className="data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black">
+                        <TabsTrigger value="url" className="text-[#9CA3AF] data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black">
                             URL
                         </TabsTrigger>
-                        <TabsTrigger value="screenshot" className="data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black">
+                        <TabsTrigger value="screenshot" className="text-[#9CA3AF] data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black">
                             Screenshot
                         </TabsTrigger>
-                        <TabsTrigger value="manual" className="data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black">
+                        <TabsTrigger value="manual" className="text-[#9CA3AF] data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black">
                             Manual
                         </TabsTrigger>
                     </TabsList>
