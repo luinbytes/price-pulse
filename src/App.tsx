@@ -6,8 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ProductInput } from '@/components/product-input'
 import { ProductList } from '@/components/product-list'
+import { ProductDetail } from '@/components/product-detail'
+import { Settings } from '@/components/settings'
 import { supabase } from '@/lib/supabase'
+import type { Product } from '@/lib/database.types'
 import './App.css'
+
+interface UserProfile {
+  username: string | null
+  avatar_url: string | null
+}
 
 function LoginPage() {
   const { signInWithGitHub, signInWithGoogle } = useAuth()
@@ -38,7 +46,7 @@ function LoginPage() {
           <Button
             onClick={signInWithGoogle}
             variant="outline"
-            className="w-full border-[#2A2A2A] bg-transparent hover:bg-[#2A2A2A] text-[#EDEDED]"
+            className="w-full border-[#3A3A3A] bg-transparent hover:bg-[#2A2A2A] text-[#EDEDED]"
           >
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -58,10 +66,14 @@ function Dashboard() {
   const { user, signOut } = useAuth()
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [stats, setStats] = useState({ total: 0, drops: 0, savings: 0 })
+  const [profile, setProfile] = useState<UserProfile>({ username: null, avatar_url: null })
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   useEffect(() => {
     if (user) {
       fetchStats()
+      fetchProfile()
     }
   }, [user, refreshTrigger])
 
@@ -75,30 +87,69 @@ function Dashboard() {
 
     setStats({
       total: products?.length || 0,
-      drops: 0, // Will compute from price history
-      savings: 0 // Will compute from price history
+      drops: 0,
+      savings: 0
     })
+  }
+
+  const fetchProfile = async () => {
+    if (!user) return
+
+    const { data } = await supabase
+      .from('user_settings')
+      .select('username, avatar_url')
+      .eq('id', user.id)
+      .single()
+
+    if (data) {
+      setProfile({ username: data.username, avatar_url: data.avatar_url })
+    }
   }
 
   const handleProductAdded = () => {
     setRefreshTrigger(prev => prev + 1)
   }
 
+  const handleProductSelect = (product: Product) => {
+    setSelectedProduct(product)
+    setDetailOpen(true)
+  }
+
+  const handleProductDeleted = () => {
+    setRefreshTrigger(prev => prev + 1)
+  }
+
+  const displayName = profile.username || user?.email?.split('@')[0] || 'User'
+
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
       {/* Header */}
       <header className="border-b border-[#2A2A2A] bg-[#0A0A0A]/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-xl font-bold bg-gradient-to-r from-[#794A63] via-[#B3688A] to-[#FF9EB5] bg-clip-text text-transparent">
             PricePulse
           </h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-[#9CA3AF]">{user?.email}</span>
+          <div className="flex items-center gap-3">
+            {/* User Profile Display */}
+            <div className="flex items-center gap-2">
+              {profile.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt="Avatar"
+                  className="w-8 h-8 rounded-full object-cover border border-[#FF9EB5]"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#794A63] to-[#FF9EB5] flex items-center justify-center text-sm font-bold text-white">
+                  {displayName[0].toUpperCase()}
+                </div>
+              )}
+              <span className="text-sm text-[#EDEDED] font-medium hidden sm:block">{displayName}</span>
+            </div>
             <Button
               variant="outline"
               size="sm"
               onClick={signOut}
-              className="border-[#2A2A2A] bg-transparent hover:bg-[#2A2A2A] text-[#EDEDED]"
+              className="border-[#3A3A3A] bg-transparent hover:bg-[#2A2A2A] text-[#EDEDED]"
             >
               Sign Out
             </Button>
@@ -109,17 +160,30 @@ function Dashboard() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="dashboard" className="w-full">
+          {/* Fixed Tab Styling - Better contrast for inactive tabs */}
           <TabsList className="bg-[#1A1A1A] border border-[#2A2A2A]">
-            <TabsTrigger value="dashboard" className="data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black">
+            <TabsTrigger
+              value="dashboard"
+              className="text-[#9CA3AF] data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black"
+            >
               Dashboard
             </TabsTrigger>
-            <TabsTrigger value="products" className="data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black">
+            <TabsTrigger
+              value="products"
+              className="text-[#9CA3AF] data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black"
+            >
               Products
             </TabsTrigger>
-            <TabsTrigger value="add" className="data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black">
+            <TabsTrigger
+              value="add"
+              className="text-[#9CA3AF] data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black"
+            >
               Add Product
             </TabsTrigger>
-            <TabsTrigger value="settings" className="data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black">
+            <TabsTrigger
+              value="settings"
+              className="text-[#9CA3AF] data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black"
+            >
               Settings
             </TabsTrigger>
           </TabsList>
@@ -147,12 +211,18 @@ function Dashboard() {
             </div>
 
             <div className="mt-6">
-              <ProductList refreshTrigger={refreshTrigger} />
+              <ProductList
+                refreshTrigger={refreshTrigger}
+                onProductSelect={handleProductSelect}
+              />
             </div>
           </TabsContent>
 
           <TabsContent value="products" className="mt-6">
-            <ProductList refreshTrigger={refreshTrigger} />
+            <ProductList
+              refreshTrigger={refreshTrigger}
+              onProductSelect={handleProductSelect}
+            />
           </TabsContent>
 
           <TabsContent value="add" className="mt-6">
@@ -160,22 +230,18 @@ function Dashboard() {
           </TabsContent>
 
           <TabsContent value="settings" className="mt-6">
-            <Card className="bg-[#1A1A1A] border-[#2A2A2A]">
-              <CardHeader>
-                <CardTitle className="text-[#EDEDED]">Settings</CardTitle>
-                <CardDescription className="text-[#9CA3AF]">
-                  Configure your notifications and preferences
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center text-[#9CA3AF] py-8">
-                  Settings form coming soon...
-                </p>
-              </CardContent>
-            </Card>
+            <Settings onProfileUpdate={fetchProfile} />
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* Product Detail Modal */}
+      <ProductDetail
+        product={selectedProduct}
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        onDelete={handleProductDeleted}
+      />
     </div>
   )
 }
