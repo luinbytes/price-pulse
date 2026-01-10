@@ -76,6 +76,8 @@ export interface Database {
                     discord_webhook: string | null
                     check_frequency: string
                     default_currency: string
+                    username: string | null
+                    avatar_url: string | null
                     created_at: string
                 }
                 Insert: {
@@ -83,6 +85,8 @@ export interface Database {
                     discord_webhook?: string | null
                     check_frequency?: string
                     default_currency?: string
+                    username?: string | null
+                    avatar_url?: string | null
                     created_at?: string
                 }
                 Update: {
@@ -90,6 +94,8 @@ export interface Database {
                     discord_webhook?: string | null
                     check_frequency?: string
                     default_currency?: string
+                    username?: string | null
+                    avatar_url?: string | null
                     created_at?: string
                 }
             }
