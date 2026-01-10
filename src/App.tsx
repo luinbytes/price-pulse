@@ -1,8 +1,12 @@
+import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from './lib/auth'
 import { Toaster } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ProductInput } from '@/components/product-input'
+import { ProductList } from '@/components/product-list'
+import { supabase } from '@/lib/supabase'
 import './App.css'
 
 function LoginPage() {
@@ -52,6 +56,33 @@ function LoginPage() {
 
 function Dashboard() {
   const { user, signOut } = useAuth()
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [stats, setStats] = useState({ total: 0, drops: 0, savings: 0 })
+
+  useEffect(() => {
+    if (user) {
+      fetchStats()
+    }
+  }, [user, refreshTrigger])
+
+  const fetchStats = async () => {
+    if (!user) return
+
+    const { data: products } = await supabase
+      .from('products')
+      .select('*')
+      .eq('user_id', user.id)
+
+    setStats({
+      total: products?.length || 0,
+      drops: 0, // Will compute from price history
+      savings: 0 // Will compute from price history
+    })
+  }
+
+  const handleProductAdded = () => {
+    setRefreshTrigger(prev => prev + 1)
+  }
 
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
@@ -98,65 +129,34 @@ function Dashboard() {
               <Card className="bg-[#1A1A1A] border-[#2A2A2A]">
                 <CardHeader className="pb-2">
                   <CardDescription className="text-[#9CA3AF]">Total Products</CardDescription>
-                  <CardTitle className="text-3xl text-[#EDEDED]">0</CardTitle>
+                  <CardTitle className="text-3xl text-[#EDEDED]">{stats.total}</CardTitle>
                 </CardHeader>
               </Card>
               <Card className="bg-[#1A1A1A] border-[#2A2A2A]">
                 <CardHeader className="pb-2">
                   <CardDescription className="text-[#9CA3AF]">Price Drops</CardDescription>
-                  <CardTitle className="text-3xl text-green-400">0</CardTitle>
+                  <CardTitle className="text-3xl text-green-400">{stats.drops}</CardTitle>
                 </CardHeader>
               </Card>
               <Card className="bg-[#1A1A1A] border-[#2A2A2A]">
                 <CardHeader className="pb-2">
                   <CardDescription className="text-[#9CA3AF]">Total Savings</CardDescription>
-                  <CardTitle className="text-3xl text-[#FF9EB5]">$0.00</CardTitle>
+                  <CardTitle className="text-3xl text-[#FF9EB5]">${stats.savings.toFixed(2)}</CardTitle>
                 </CardHeader>
               </Card>
             </div>
 
-            <Card className="mt-6 bg-[#1A1A1A] border-[#2A2A2A]">
-              <CardHeader>
-                <CardTitle className="text-[#EDEDED]">Recent Activity</CardTitle>
-                <CardDescription className="text-[#9CA3AF]">
-                  Your tracked products will appear here
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center text-[#9CA3AF] py-8">
-                  No products tracked yet. Add your first product to get started!
-                </p>
-              </CardContent>
-            </Card>
+            <div className="mt-6">
+              <ProductList refreshTrigger={refreshTrigger} />
+            </div>
           </TabsContent>
 
           <TabsContent value="products" className="mt-6">
-            <Card className="bg-[#1A1A1A] border-[#2A2A2A]">
-              <CardHeader>
-                <CardTitle className="text-[#EDEDED]">Your Products</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center text-[#9CA3AF] py-8">
-                  No products yet. Add your first product to start tracking!
-                </p>
-              </CardContent>
-            </Card>
+            <ProductList refreshTrigger={refreshTrigger} />
           </TabsContent>
 
           <TabsContent value="add" className="mt-6">
-            <Card className="bg-[#1A1A1A] border-[#2A2A2A]">
-              <CardHeader>
-                <CardTitle className="text-[#EDEDED]">Add Product</CardTitle>
-                <CardDescription className="text-[#9CA3AF]">
-                  Add a product to track by URL, screenshot, or manual entry
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-center text-[#9CA3AF] py-8">
-                  Product input form coming soon...
-                </p>
-              </CardContent>
-            </Card>
+            <ProductInput onProductAdded={handleProductAdded} />
           </TabsContent>
 
           <TabsContent value="settings" className="mt-6">
