@@ -44,7 +44,7 @@ export function ProductInput({ onProductAdded }: ProductInputProps) {
             const { error } = await supabase.from('products').insert({
                 user_id: user.id,
                 name: urlName,
-                url: url,
+                url: url || null,
                 current_price: price,
                 currency: currency
             })
