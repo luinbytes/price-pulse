@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { toast } from 'sonner'
+import { AlertCircle, Loader2 } from 'lucide-react'
 import type { Product } from '@/lib/database.types'
 
 interface ProductListProps {
@@ -119,10 +120,10 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
                         >
                             <div className="flex-1">
                                 <div className="flex items-center gap-2">
-                                    <h3 className="font-semibold text-[#EDEDED]">{product.name}</h3>
-                                    <Badge variant="outline" className="border-[#2A2A2A] text-[#9CA3AF]">
-                                        {product.currency}
-                                    </Badge>
+                                    <CardTitle className="text-sm font-semibold truncate group-hover:text-[#FF9EB5] transition-colors flex items-center gap-2">
+                                        {product.name.startsWith('⚠️') && <AlertCircle className="w-4 h-4 text-orange-400 shrink-0" />}
+                                        {product.name}
+                                    </CardTitle>
                                 </div>
                                 <p className="text-sm text-[#9CA3AF] mt-1">
                                     Added {formatDate(product.created_at)}
