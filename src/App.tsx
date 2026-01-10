@@ -1,4 +1,3 @@
-```
 import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from './lib/auth'
 import { Toaster } from '@/components/ui/sonner'
@@ -7,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PlusCircle } from 'lucide-react'
 import { generateRandomUsername } from '@/lib/utils-app'
+import { ProductInputModal } from '@/components/product-input-modal'
 import { ProductList } from '@/components/product-list'
 import { ProductDetail } from '@/components/product-detail'
 import { Settings } from '@/components/settings'
@@ -105,10 +105,6 @@ function Dashboard() {
       .single()
 
     if (data) {
-      if (!data.username) {
-        // If no username set yet, we could auto-generate one here OR just rely on logic below
-        // But for consistency let's just use what's in DB
-      }
       setProfile({ username: data.username, avatar_url: data.avatar_url })
     }
   }
@@ -127,7 +123,7 @@ function Dashboard() {
   }
 
   // Use random username generator or fallback to email handle
-  const randomName = useState(() => generateRandomUsername())[0]
+  const [randomName] = useState(() => generateRandomUsername())
   const displayName = profile.username || randomName
 
   return (

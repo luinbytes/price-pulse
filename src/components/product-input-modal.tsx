@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { scrapeProductInfo } from '@/lib/utils-app'
-import { PlusCircle, Link as LinkIcon, Camera, Layout } from 'lucide-react'
+import { Link as LinkIcon, Camera } from 'lucide-react'
 
 interface ProductInputModalProps {
     open: boolean
@@ -30,6 +30,7 @@ export function ProductInputModal({ open, onOpenChange, onProductAdded }: Produc
 
     // Screenshot state
     const [isExtracting, setIsExtracting] = useState(false)
+    const [isDragging, setIsDragging] = useState(false)
 
     // Reset form on open/close
     useEffect(() => {
@@ -39,6 +40,7 @@ export function ProductInputModal({ open, onOpenChange, onProductAdded }: Produc
             setPrice('')
             setCurrency('USD')
             setImageUrl('')
+            setIsDragging(false)
         }
     }, [open])
 
@@ -109,6 +111,44 @@ export function ProductInputModal({ open, onOpenChange, onProductAdded }: Produc
         }
     }
 
+    // Drag and drop handlers
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault()
+        setIsDragging(true)
+    }
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault()
+        setIsDragging(false)
+    }
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault()
+        setIsDragging(false)
+        const file = e.dataTransfer.files?.[0]
+        if (file && file.type.startsWith('image/')) {
+            handleScreenshotUpload(file)
+        }
+    }
+
+    // Paste handler
+    useEffect(() => {
+        const handlePaste = (e: ClipboardEvent) => {
+            if (!open) return
+            const items = e.clipboardData?.items
+            if (!items) return
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const blob = items[i].getAsFile()
+                    if (blob) handleScreenshotUpload(blob)
+                    break
+                }
+            }
+        }
+        window.addEventListener('paste', handlePaste)
+        return () => window.removeEventListener('paste', handlePaste)
+    }, [open])
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="bg-[#1A1A1A] border-[#2A2A2A] text-[#EDEDED] sm:max-w-md">
@@ -147,8 +187,12 @@ export function ProductInputModal({ open, onOpenChange, onProductAdded }: Produc
 
                         <TabsContent value="screenshot" className="space-y-4 mt-0">
                             <div
-                                className="border-2 border-dashed border-[#FF9EB5]/30 hover:border-[#FF9EB5] bg-[#FF9EB5]/5 rounded-xl p-8 text-center cursor-pointer transition-all hover:bg-[#FF9EB5]/10 group"
+                                className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all group overflow-hidden relative
+                                    ${isDragging ? 'border-[#FF9EB5] bg-[#FF9EB5]/20' : 'border-[#FF9EB5]/30 bg-[#FF9EB5]/5 hover:border-[#FF9EB5] hover:bg-[#FF9EB5]/10'}`}
                                 onClick={() => document.getElementById('modal-screenshot-input')?.click()}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
                             >
                                 <input
                                     id="modal-screenshot-input"
@@ -168,15 +212,11 @@ export function ProductInputModal({ open, onOpenChange, onProductAdded }: Produc
                                 ) : (
                                     <div className="text-[#EDEDED]">
                                         <Camera className="w-12 h-12 mx-auto mb-3 text-[#FF9EB5] opacity-80 group-hover:scale-110 transition-transform" />
-                                        <p className="text-lg font-semibold">Upload Photo/Screenshot</p>
-                                        <p className="text-xs text-[#9CA3AF] mt-1">We'll scan for prices using AI</p>
+                                        <p className="text-lg font-semibold">Upload or Paste Image</p>
+                                        <p className="text-xs text-[#9CA3AF] mt-1">Drag files or Ctrl+V here</p>
                                     </div>
                                 )}
                             </div>
-                        </TabsContent>
-
-                        <TabsContent value="manual" className="space-y-4 mt-0">
-                            <p className="text-xs text-[#9CA3AF]">Fill in the details manually below</p>
                         </TabsContent>
 
                         <div className="space-y-4 border-t border-[#2A2A2A] pt-4">
