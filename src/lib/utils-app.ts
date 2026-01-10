@@ -1,13 +1,13 @@
 export async function scrapeProductInfo(url: string) {
     try {
-        // Using a public CORS proxy (allorigins.win) to fetch the HTML
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`
+        // Switch to a different CORS proxy that might be more reliable for localhost
+        // Using corsproxy.io instead of allorigins.win
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`
         const response = await fetch(proxyUrl)
 
-        if (!response.ok) throw new Error('Failed to fetch product page')
+        if (!response.ok) throw new Error(`Failed to fetch product page: ${response.statusText}`)
 
-        const data = await response.json()
-        const html = data.contents
+        const html = await response.text()
 
         // Create a temporary document to parse the HTML
         const parser = new DOMParser()
@@ -16,20 +16,27 @@ export async function scrapeProductInfo(url: string) {
         // 1. Extract Name
         let name = doc.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
             doc.querySelector('meta[name="twitter:title"]')?.getAttribute('content') ||
+            doc.querySelector('h1')?.textContent?.trim() ||
             doc.title ||
             ''
 
-        // Clean up name (remove site name suffixes)
+        // Clean up name (remove site name suffixes like "Amazon.co.uk:")
+        if (name.includes(':')) {
+            const parts = name.split(':')
+            if (parts.length > 1 && parts[0].toLowerCase().includes('amazon')) {
+                name = parts.slice(1).join(':').trim()
+            }
+        }
         name = name.split('|')[0].split('-')[0].trim()
 
         // 2. Extract Price & Currency
-        // Try meta tags first (common in Shopify/OpenGraph)
         let price: number | null = null
         let currency = 'USD'
 
+        // Try meta tags first
         const priceMeta = doc.querySelector('meta[property="product:price:amount"]') ||
             doc.querySelector('meta[property="og:price:amount"]') ||
-            doc.querySelector('meta[name="twitter:data1"]') // Sometimes price is here
+            doc.querySelector('meta[name="twitter:data1"]')
 
         const currencyMeta = doc.querySelector('meta[property="product:price:currency"]') ||
             doc.querySelector('meta[property="og:price:currency"]')
@@ -44,31 +51,47 @@ export async function scrapeProductInfo(url: string) {
             currency = currencyMeta.getAttribute('content') || 'USD'
         }
 
-        // Fallback: If price not found in meta, look for common selectors or text patterns
+        // Fallback: If price not found in meta, look for common selectors
         if (price === null) {
+            const priceSelectors = [
+                '.a-price .a-offscreen', // Amazon hidden price
+                '.a-price-whole', // Amazon visible whole
+                '#priceblock_ourprice',
+                '#priceblock_dealprice',
+                '#price_inside_buybox',
+                '.priceToPay',
+                '.pp-price',
+                '[class*="price-actual"]',
+                '[class*="price-item"]'
+            ]
+
             const pricePatterns = [
                 /\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?/,  // $1,234.56
                 /€\d{1,3}(?:\.\d{3})*(?:,\d{2})?/,   // €1.234,56
                 /£\d{1,3}(?:,\d{3})*(?:\.\d{2})?/,   // £1,234.56
-            ]
-
-            // Look in common price containers
-            const priceSelectors = [
-                '[class*="price"]',
-                '[id*="price"]',
-                '.a-price-whole', // Amazon
-                '.pp-price' // Common
+                /\d{1,3}(?:,\d{3})*(?:\.\d{2})?/      // just numbers
             ]
 
             for (const selector of priceSelectors) {
                 const el = doc.querySelector(selector)
                 if (el) {
                     const text = el.textContent || ''
+                    // Try to extract num from text directly first
+                    const num = parseFloat(text.replace(/[^0-9.]/g, ''))
+                    if (!isNaN(num) && num > 0) {
+                        price = num
+                        // Detect currency
+                        if (text.includes('$')) currency = 'USD'
+                        else if (text.includes('€')) currency = 'EUR'
+                        else if (text.includes('£')) currency = 'GBP'
+                        break
+                    }
+
+                    // Try patterns if direct parse fails
                     for (const pattern of pricePatterns) {
                         const match = text.match(pattern)
                         if (match) {
                             price = parseFloat(match[0].replace(/[^0-9.]/g, ''))
-                            // Detect currency from symbol if needed
                             if (match[0].includes('$')) currency = 'USD'
                             else if (match[0].includes('€')) currency = 'EUR'
                             else if (match[0].includes('£')) currency = 'GBP'
@@ -83,6 +106,8 @@ export async function scrapeProductInfo(url: string) {
         // 3. Extract Image
         const image = doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
             doc.querySelector('meta[name="twitter:image"]')?.getAttribute('content') ||
+            doc.querySelector('#landingImage')?.getAttribute('src') ||
+            doc.querySelector('#imgBlkFront')?.getAttribute('src') ||
             ''
 
         return {

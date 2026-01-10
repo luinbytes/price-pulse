@@ -41,8 +41,22 @@ export function ProductInputModal({ open, onOpenChange, onProductAdded }: Produc
             setCurrency('USD')
             setImageUrl('')
             setIsDragging(false)
+        } else if (user) {
+            // Fetch user's default currency when modal opens
+            const fetchDefaultCurrency = async () => {
+                const { data } = await supabase
+                    .from('user_settings')
+                    .select('default_currency')
+                    .eq('id', user.id)
+                    .single()
+
+                if (data?.default_currency) {
+                    setCurrency(data.default_currency)
+                }
+            }
+            fetchDefaultCurrency()
         }
-    }, [open])
+    }, [open, user])
 
     const handleUrlBlur = async () => {
         if (!url || !url.startsWith('http')) return
@@ -177,7 +191,11 @@ export function ProductInputModal({ open, onOpenChange, onProductAdded }: Produc
                                     id="url"
                                     placeholder="Paste Amazon, eBay, etc. link..."
                                     value={url}
-                                    onChange={(e) => setUrl(e.target.value)}
+                                    onChange={(e) => {
+                                        setUrl(e.target.value)
+                                        // Trigger scraping if URL looks complete (starts with http and has some length)
+                                        // But onBlur is safer to avoid excessive proxy calls
+                                    }}
                                     onBlur={handleUrlBlur}
                                     className="bg-[#0A0A0A] border-[#2A2A2A] text-[#EDEDED] focus:border-[#FF9EB5]"
                                 />
