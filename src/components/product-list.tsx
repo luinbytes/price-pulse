@@ -167,11 +167,11 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
     }
 
     return (
-        <Card className="glass-card border-[rgba(255,255,255,0.1)] overflow-hidden">
-            <CardHeader className="border-b border-[rgba(255,255,255,0.05)]">
+        <Card className="glass-ultra border-[rgba(255,255,255,0.15)] overflow-hidden shadow-xl">
+            <CardHeader className="border-b border-[rgba(255,255,255,0.1)]">
                 <CardTitle className="text-[#EDEDED] text-2xl font-bold flex items-center gap-3">
                     <span>Your Products</span>
-                    <Badge className="bg-gradient-to-r from-[#FF9EB5] to-[#B3688A] text-black font-bold px-3 py-1">
+                    <Badge className="bg-gradient-to-r from-[#FF9EB5] to-[#B3688A] text-black font-bold px-3 py-1 shadow-lg">
                         {products.length}
                     </Badge>
                 </CardTitle>
@@ -181,11 +181,13 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
                     {products.map((product, index) => (
                         <div
                             key={product.id}
-                            className="group relative overflow-hidden p-5 rounded-2xl glass-card border-[rgba(255,255,255,0.08)] hover:border-[#FF9EB5]/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-[#FF9EB5]/10 animate-slide-up"
+                            className="glass-parallax group relative overflow-visible p-5 rounded-2xl glass-card border-[rgba(255,255,255,0.12)] hover:border-[#FF9EB5]/50 transition-all cursor-pointer hover:shadow-2xl hover:shadow-[#FF9EB5]/20 animate-slide-up"
                             style={{ animationDelay: `${index * 0.05}s` }}
                             onClick={() => onProductSelect?.(product)}
                         >
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF9EB5]/5 rounded-full blur-2xl transform translate-x-16 -translate-y-16 group-hover:scale-150 transition-transform duration-500"></div>
+                            <div className="glass-layer-1 pointer-events-none"></div>
+                            <div className="glass-layer-2 pointer-events-none"></div>
+                            <div className="absolute top-0 right-0 w-40 h-40 bg-[#FF9EB5]/8 rounded-full blur-3xl transform translate-x-20 -translate-y-20 group-hover:scale-150 transition-transform duration-700"></div>
 
                             <div className="relative z-10 flex items-center justify-between gap-4">
                                 <div className="flex-1 min-w-0 space-y-2">

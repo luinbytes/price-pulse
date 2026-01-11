@@ -29,17 +29,18 @@ function LoginPage() {
         <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-[#794A63]/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }}></div>
       </div>
 
-      <Card className="w-full max-w-md glass-card border-[rgba(255,255,255,0.1)] animate-slide-up relative z-10">
-        <CardHeader className="text-center space-y-4 pb-6">
-          <div className="inline-flex items-center justify-center w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-[#FF9EB5] to-[#794A63] p-0.5 glow-accent animate-pulse-glow">
-            <div className="w-full h-full rounded-2xl bg-[#0A0A0A] flex items-center justify-center">
-              <span className="text-4xl">💰</span>
+      <Card className="w-full max-w-md glass-ultra border-[rgba(255,255,255,0.2)] animate-slide-up relative z-10 shadow-2xl">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#FF9EB5]/10 via-transparent to-[#794A63]/10 rounded-xl"></div>
+        <CardHeader className="text-center space-y-4 pb-6 relative z-10">
+          <div className="inline-flex items-center justify-center w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-[#FF9EB5] to-[#794A63] p-1 glow-accent animate-pulse-glow">
+            <div className="w-full h-full rounded-3xl glass-card flex items-center justify-center">
+              <span className="text-5xl">💰</span>
             </div>
           </div>
-          <CardTitle className="text-4xl font-bold tracking-tight">
+          <CardTitle className="text-5xl font-black tracking-tight">
             <span className="text-gradient">PricePulse</span>
           </CardTitle>
-          <CardDescription className="text-[#9CA3AF] text-base">
+          <CardDescription className="text-[#9CA3AF] text-lg font-medium">
             Track product prices across the web and never miss a deal
           </CardDescription>
         </CardHeader>
@@ -143,7 +144,7 @@ function Dashboard() {
   return (
     <div className="min-h-screen gradient-mesh grain-overlay">
       {/* Header */}
-      <header className="border-b border-[rgba(255,255,255,0.08)] glass-card sticky top-0 z-50">
+      <header className="border-b border-[rgba(255,255,255,0.15)] glass-ultra sticky top-0 z-50 shadow-2xl">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-6">
             <h1 className="text-2xl font-bold tracking-tight">
@@ -199,7 +200,7 @@ function Dashboard() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="glass-card border-[rgba(255,255,255,0.1)] p-1.5">
+          <TabsList className="glass-ultra border-[rgba(255,255,255,0.2)] p-1.5 shadow-xl">
             <TabsTrigger
               value="dashboard"
               className="text-[#9CA3AF] data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#FF9EB5] data-[state=active]:to-[#B3688A] data-[state=active]:text-black font-medium transition-all data-[state=active]:shadow-lg"
@@ -222,44 +223,53 @@ function Dashboard() {
 
           <TabsContent value="dashboard" className="mt-8 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <Card className="glass-card border-[rgba(255,255,255,0.1)] overflow-hidden group hover:border-[#FF9EB5]/30 transition-all hover:shadow-xl hover:shadow-[#FF9EB5]/10 animate-slide-up stagger-1">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF9EB5]/5 rounded-full blur-2xl transform translate-x-16 -translate-y-16 group-hover:scale-150 transition-transform duration-500"></div>
+              <Card className="glass-parallax glass-card border-[rgba(255,255,255,0.15)] overflow-visible group hover:border-[#FF9EB5]/40 transition-all hover:shadow-2xl hover:shadow-[#FF9EB5]/20 animate-slide-up stagger-1">
+                <div className="glass-layer-1 pointer-events-none"></div>
+                <div className="glass-layer-2 pointer-events-none"></div>
+                <div className="glass-layer-3 pointer-events-none"></div>
+                <div className="absolute top-0 right-0 w-40 h-40 bg-[#FF9EB5]/10 rounded-full blur-3xl transform translate-x-16 -translate-y-16 group-hover:scale-150 transition-transform duration-700"></div>
                 <CardHeader className="pb-3 relative z-10">
-                  <CardDescription className="text-[#9CA3AF] text-xs font-semibold uppercase tracking-wider">Total Products</CardDescription>
-                  <CardTitle className="text-5xl font-black text-[#EDEDED] stat-value tracking-tight">{stats.total}</CardTitle>
-                  <div className="flex items-center gap-2 mt-2">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF9EB5] to-[#B3688A] flex items-center justify-center text-sm">
+                  <CardDescription className="text-[#9CA3AF] text-xs font-bold uppercase tracking-widest">Total Products</CardDescription>
+                  <CardTitle className="text-6xl font-black text-[#EDEDED] stat-value tracking-tight">{stats.total}</CardTitle>
+                  <div className="flex items-center gap-2 mt-3">
+                    <div className="w-10 h-10 rounded-xl glass-card flex items-center justify-center text-lg shadow-lg">
                       📦
                     </div>
-                    <span className="text-xs text-[#6B7280]">Being tracked</span>
+                    <span className="text-xs text-[#6B7280] font-medium">Being tracked</span>
                   </div>
                 </CardHeader>
               </Card>
 
-              <Card className="glass-card border-[rgba(255,255,255,0.1)] overflow-hidden group hover:border-green-400/30 transition-all hover:shadow-xl hover:shadow-green-400/10 animate-slide-up stagger-2">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-green-400/5 rounded-full blur-2xl transform translate-x-16 -translate-y-16 group-hover:scale-150 transition-transform duration-500"></div>
+              <Card className="glass-parallax glass-card border-[rgba(255,255,255,0.15)] overflow-visible group hover:border-green-400/40 transition-all hover:shadow-2xl hover:shadow-green-400/20 animate-slide-up stagger-2">
+                <div className="glass-layer-1 pointer-events-none"></div>
+                <div className="glass-layer-2 pointer-events-none"></div>
+                <div className="glass-layer-3 pointer-events-none"></div>
+                <div className="absolute top-0 right-0 w-40 h-40 bg-green-400/10 rounded-full blur-3xl transform translate-x-16 -translate-y-16 group-hover:scale-150 transition-transform duration-700"></div>
                 <CardHeader className="pb-3 relative z-10">
-                  <CardDescription className="text-[#9CA3AF] text-xs font-semibold uppercase tracking-wider">Price Drops</CardDescription>
-                  <CardTitle className="text-5xl font-black text-green-400 stat-value tracking-tight">{stats.drops}</CardTitle>
-                  <div className="flex items-center gap-2 mt-2">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-sm">
+                  <CardDescription className="text-[#9CA3AF] text-xs font-bold uppercase tracking-widest">Price Drops</CardDescription>
+                  <CardTitle className="text-6xl font-black text-green-400 stat-value tracking-tight">{stats.drops}</CardTitle>
+                  <div className="flex items-center gap-2 mt-3">
+                    <div className="w-10 h-10 rounded-xl glass-card flex items-center justify-center text-lg shadow-lg">
                       📉
                     </div>
-                    <span className="text-xs text-[#6B7280]">This month</span>
+                    <span className="text-xs text-[#6B7280] font-medium">This month</span>
                   </div>
                 </CardHeader>
               </Card>
 
-              <Card className="glass-card border-[rgba(255,255,255,0.1)] overflow-hidden group hover:border-[#FF9EB5]/30 transition-all hover:shadow-xl hover:shadow-[#FF9EB5]/10 animate-slide-up stagger-3">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF9EB5]/5 rounded-full blur-2xl transform translate-x-16 -translate-y-16 group-hover:scale-150 transition-transform duration-500"></div>
+              <Card className="glass-parallax glass-card border-[rgba(255,255,255,0.15)] overflow-visible group hover:border-[#FF9EB5]/40 transition-all hover:shadow-2xl hover:shadow-[#FF9EB5]/20 animate-slide-up stagger-3">
+                <div className="glass-layer-1 pointer-events-none"></div>
+                <div className="glass-layer-2 pointer-events-none"></div>
+                <div className="glass-layer-3 pointer-events-none"></div>
+                <div className="absolute top-0 right-0 w-40 h-40 bg-[#FF9EB5]/10 rounded-full blur-3xl transform translate-x-16 -translate-y-16 group-hover:scale-150 transition-transform duration-700"></div>
                 <CardHeader className="pb-3 relative z-10">
-                  <CardDescription className="text-[#9CA3AF] text-xs font-semibold uppercase tracking-wider">Total Savings</CardDescription>
-                  <CardTitle className="text-5xl font-black text-gradient stat-value tracking-tight">${stats.savings.toFixed(2)}</CardTitle>
-                  <div className="flex items-center gap-2 mt-2">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF9EB5] to-[#794A63] flex items-center justify-center text-sm">
+                  <CardDescription className="text-[#9CA3AF] text-xs font-bold uppercase tracking-widest">Total Savings</CardDescription>
+                  <CardTitle className="text-6xl font-black text-gradient stat-value tracking-tight">${stats.savings.toFixed(2)}</CardTitle>
+                  <div className="flex items-center gap-2 mt-3">
+                    <div className="w-10 h-10 rounded-xl glass-card flex items-center justify-center text-lg shadow-lg">
                       💰
                     </div>
-                    <span className="text-xs text-[#6B7280]">All time</span>
+                    <span className="text-xs text-[#6B7280] font-medium">All time</span>
                   </div>
                 </CardHeader>
               </Card>
