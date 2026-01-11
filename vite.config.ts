@@ -11,5 +11,5 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  base: "/price-tracker/", // For GitHub Pages
+  base: "/price-pulse/", // For GitHub Pages
 })
