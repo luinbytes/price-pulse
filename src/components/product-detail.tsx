@@ -125,8 +125,13 @@ export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: Pr
                         } catch { /* ignore URL parse errors */ }
                     }
                 }
-                // Final cleanup
-                const cleanQuery = searchName.replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim().split(' ').slice(0, 5).join(' ')
+                // Extract size/specs from the original product name for better matching
+                const specMatches = product.name.match(/(\d+(?:\.\d+)?)\s*(oz|ml|l|liter|litre|GB|TB|inch|in)/gi) || []
+                const specs = specMatches.map(s => s.replace(/\s+/g, '')).slice(0, 2)
+
+                // Final cleanup - include specs in search
+                const words = searchName.replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim().split(' ').slice(0, 4)
+                const cleanQuery = [...words, ...specs].join(' ')
                 const encoded = encodeURIComponent(cleanQuery || 'product')
 
                 // Locale-aware store URLs based on product currency
@@ -374,6 +379,7 @@ export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: Pr
                                             </div>
                                         )}
                                     </div>
+                                    <p className="text-[10px] text-[#6B7280] -mt-1">Prices are for similar products. Click to verify exact match.</p>
 
                                     {comparisonPrices.length > 0 ? (
                                         <div className="grid grid-cols-1 gap-2">
@@ -480,6 +486,6 @@ export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: Pr
                     </div>
                 )}
             </DialogContent>
-        </Dialog>
+        </Dialog >
     )
 }

@@ -15,6 +15,33 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
+// Extract key specifications from product name for better search matching
+function extractProductSpecs(name: string): { brand: string; specs: string[]; cleanName: string } {
+    const specs: string[] = []
+
+    // Extract size/volume specs (e.g., 32oz, 40oz, 1L, 500ml)
+    const sizeMatch = name.match(/(\d+(?:\.\d+)?)\s*(oz|ml|l|liter|litre|fl\.?\s*oz|gallon|gal|quart|qt)/gi)
+    if (sizeMatch) specs.push(...sizeMatch.map(s => s.trim()))
+
+    // Extract capacity/storage specs (e.g., 256GB, 1TB, 16GB RAM)
+    const storageMatch = name.match(/(\d+)\s*(GB|TB|MB)/gi)
+    if (storageMatch) specs.push(...storageMatch.map(s => s.trim()))
+
+    // Extract screen size (e.g., 15.6", 27 inch)
+    const screenMatch = name.match(/(\d+(?:\.\d+)?)\s*["']?\s*(inch|in)?/gi)
+    if (screenMatch) specs.push(...screenMatch.filter(s => parseFloat(s) >= 5 && parseFloat(s) <= 100).map(s => s.trim()))
+
+    // Extract dimensions (e.g., 40x30, large, small, medium)
+    const dimMatch = name.match(/\b(small|medium|large|xl|xxl|xs)\b/gi)
+    if (dimMatch) specs.push(...dimMatch.map(s => s.trim()))
+
+    // Get first word as potential brand (if it looks like a brand name)
+    const words = name.split(/\s+/)
+    const brand = words[0]?.length > 2 ? words[0] : ''
+
+    return { brand, specs, cleanName: name }
+}
+
 // Locale-specific store configurations
 const STORE_CONFIGS: Record<string, Array<{
     name: string
@@ -25,27 +52,34 @@ const STORE_CONFIGS: Record<string, Array<{
     'USD': [
         { name: 'Amazon', searchUrl: (q) => `https://www.amazon.com/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', waitSelector: '[data-component-type="s-search-result"]' },
         { name: 'eBay', searchUrl: (q) => `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', waitSelector: '.s-item' },
-        { name: 'Walmart', searchUrl: (q) => `https://www.walmart.com/search?q=${encodeURIComponent(q)}`, priceSelector: '[data-automation-id="product-price"] span', waitSelector: '[data-item-id]' }
+        { name: 'Walmart', searchUrl: (q) => `https://www.walmart.com/search?q=${encodeURIComponent(q)}`, priceSelector: '[data-automation-id="product-price"] span', waitSelector: '[data-item-id]' },
+        { name: 'Target', searchUrl: (q) => `https://www.target.com/s?searchTerm=${encodeURIComponent(q)}`, priceSelector: '[data-test="current-price"]', waitSelector: '[data-test="product-card"]' },
+        { name: 'Best Buy', searchUrl: (q) => `https://www.bestbuy.com/site/searchpage.jsp?st=${encodeURIComponent(q)}`, priceSelector: '.priceView-customer-price span', waitSelector: '.sku-item' }
     ],
     'GBP': [
         { name: 'Amazon', searchUrl: (q) => `https://www.amazon.co.uk/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole, span.a-price', waitSelector: '[data-component-type="s-search-result"]' },
         { name: 'eBay', searchUrl: (q) => `https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price, .x-price-primary span, [data-testid="item-price"]', waitSelector: '.srp-results' },
-        { name: 'Argos', searchUrl: (q) => `https://www.argos.co.uk/search/${encodeURIComponent(q)}/`, priceSelector: '[data-test="product-card-price"], .ProductCardstyles__Price, [class*="Price"]', waitSelector: '[data-test="component-product-card"]' }
+        { name: 'Argos', searchUrl: (q) => `https://www.argos.co.uk/search/${encodeURIComponent(q)}/`, priceSelector: '[data-test="product-card-price"], .ProductCardstyles__Price, [class*="Price"]', waitSelector: '[data-test="component-product-card"]' },
+        { name: 'Currys', searchUrl: (q) => `https://www.currys.co.uk/search?q=${encodeURIComponent(q)}`, priceSelector: '[data-testid="price"]', waitSelector: '[data-testid="product-card"]' },
+        { name: 'John Lewis', searchUrl: (q) => `https://www.johnlewis.com/search?search-term=${encodeURIComponent(q)}`, priceSelector: '.price', waitSelector: '[data-test="product-card"]' }
     ],
     'EUR': [
         { name: 'Amazon', searchUrl: (q) => `https://www.amazon.de/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', waitSelector: '[data-component-type="s-search-result"]' },
         { name: 'eBay', searchUrl: (q) => `https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', waitSelector: '.s-item' },
-        { name: 'Idealo', searchUrl: (q) => `https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(q)}`, priceSelector: '[data-testid="price"]', waitSelector: '[data-testid="product-item"]' }
+        { name: 'Idealo', searchUrl: (q) => `https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(q)}`, priceSelector: '[data-testid="price"]', waitSelector: '[data-testid="product-item"]' },
+        { name: 'MediaMarkt', searchUrl: (q) => `https://www.mediamarkt.de/de/search.html?query=${encodeURIComponent(q)}`, priceSelector: '[data-test="price"]', waitSelector: '[data-test="product-tile"]' }
     ],
     'CAD': [
         { name: 'Amazon', searchUrl: (q) => `https://www.amazon.ca/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', waitSelector: '[data-component-type="s-search-result"]' },
         { name: 'eBay', searchUrl: (q) => `https://www.ebay.ca/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', waitSelector: '.s-item' },
-        { name: 'Best Buy CA', searchUrl: (q) => `https://www.bestbuy.ca/en-ca/search?search=${encodeURIComponent(q)}`, priceSelector: '[data-automation="product-price"]', waitSelector: '[data-automation="product-item"]' }
+        { name: 'Best Buy CA', searchUrl: (q) => `https://www.bestbuy.ca/en-ca/search?search=${encodeURIComponent(q)}`, priceSelector: '[data-automation="product-price"]', waitSelector: '[data-automation="product-item"]' },
+        { name: 'Walmart CA', searchUrl: (q) => `https://www.walmart.ca/search?q=${encodeURIComponent(q)}`, priceSelector: '[data-automation="product-price"]', waitSelector: '[data-automation="product-item"]' }
     ],
     'AUD': [
         { name: 'Amazon', searchUrl: (q) => `https://www.amazon.com.au/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', waitSelector: '[data-component-type="s-search-result"]' },
         { name: 'eBay', searchUrl: (q) => `https://www.ebay.com.au/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', waitSelector: '.s-item' },
-        { name: 'Kogan', searchUrl: (q) => `https://www.kogan.com/au/search/?q=${encodeURIComponent(q)}`, priceSelector: '[data-testid="price"]', waitSelector: '[data-testid="product-card"]' }
+        { name: 'Kogan', searchUrl: (q) => `https://www.kogan.com/au/search/?q=${encodeURIComponent(q)}`, priceSelector: '[data-testid="price"]', waitSelector: '[data-testid="product-card"]' },
+        { name: 'JB Hi-Fi', searchUrl: (q) => `https://www.jbhifi.com.au/search?q=${encodeURIComponent(q)}`, priceSelector: '.price', waitSelector: '.product-tile' }
     ]
 }
 
@@ -164,14 +198,23 @@ async function scrapeProductPrice(url: string, expectedCurrency: string = 'USD')
 }
 
 async function scrapeComparisonPrices(productName: string, productId: string, currency: string): Promise<void> {
-    // Clean query - take first 5 meaningful words
-    const cleanQuery = productName
+    // Extract specs from product name for more accurate searching
+    const { brand, specs } = extractProductSpecs(productName)
+
+    // Build search query: brand + key words + specs
+    const words = productName
         .replace(/[^\w\s-]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
         .split(' ')
-        .slice(0, 5)
-        .join(' ')
+        .filter(w => w.length > 2 && !/^(with|the|and|for|from)$/i.test(w))
+
+    // Take brand + first 3-4 keywords + include any extracted specs
+    const keyWords = words.slice(0, 5)
+
+    // Add specs to the query if they exist (e.g., "40oz", "1L", "256GB")
+    const specTerms = specs.filter(s => !keyWords.some(kw => kw.toLowerCase().includes(s.toLowerCase())))
+    const cleanQuery = [...keyWords, ...specTerms].join(' ')
 
     console.log(`🔍 Searching comparison prices for: "${cleanQuery}" (${currency})`)
 
