@@ -95,8 +95,29 @@ export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: Pr
 
             // If no cached data exists, generate placeholder links for immediate access
             if (!data || data.length === 0) {
-                const cleanQuery = product.name.replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim().split(' ').slice(0, 5).join(' ')
-                const encoded = encodeURIComponent(cleanQuery)
+                // Extract a better product name from URL if the stored name is a placeholder
+                let searchName = product.name
+                if (searchName.toLowerCase().startsWith('scraping') || searchName.length < 5) {
+                    // Try to extract from URL
+                    if (product.url) {
+                        try {
+                            const url = new URL(product.url)
+                            // Extract product slug from path (e.g., /dp/B09NSLTW5R or /product-name-here)
+                            const pathParts = url.pathname.split('/').filter(p => p && p.length > 3 && !/^(dp|gp|product|item|s|search|sch)$/i.test(p))
+                            if (pathParts.length > 0) {
+                                // Clean up the product slug
+                                searchName = pathParts[pathParts.length - 1]
+                                    .replace(/[-_]/g, ' ')
+                                    .replace(/B0[A-Z0-9]+/g, '') // Remove Amazon ASINs
+                                    .replace(/\d{10,}/g, '') // Remove long numbers
+                                    .trim()
+                            }
+                        } catch { /* ignore URL parse errors */ }
+                    }
+                }
+                // Final cleanup
+                const cleanQuery = searchName.replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim().split(' ').slice(0, 5).join(' ')
+                const encoded = encodeURIComponent(cleanQuery || 'product')
 
                 // Locale-aware store URLs based on product currency
                 const currency = product.currency || 'USD'
@@ -114,6 +135,7 @@ export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: Pr
                     { id: 'ebay-placeholder', store_name: 'eBay', store_url: `https://www.${locale.ebay}/sch/i.html?_nkw=${encoded}`, price: null, currency, last_checked: new Date().toISOString(), is_available: true },
                     { id: 'local-placeholder', store_name: locale.localName, store_url: `https://www.${locale.local}=${encoded}`, price: null, currency, last_checked: new Date().toISOString(), is_available: true }
                 ]
+
                 setComparisonPrices(placeholders)
             } else {
                 setComparisonPrices(data)

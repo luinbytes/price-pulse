@@ -19,59 +19,27 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
     const [loading, setLoading] = useState(true)
 
 
+    // Server-side scraping - just mark as queued, the GitHub Action will handle it
     const handleBackgroundScrape = useCallback(async (product: Product) => {
         try {
-            // Fetch user's default currency for fallback
-            const { data: settings } = await supabase
-                .from('user_settings')
-                .select('default_currency')
-                .eq('id', product.user_id)
-                .single()
+            // Mark as queued for server-side scraping
+            const { error } = await supabase
+                .from('products')
+                .update({ status: 'queued' })
+                .eq('id', product.id)
 
-            const defaultCurrency = settings?.default_currency || 'USD'
-            const { scrapeProductInfo } = await import('@/lib/utils-app')
-            const info = await scrapeProductInfo(product.url!, defaultCurrency)
+            if (error) throw error
 
-            if (info && info.name && info.price !== null) {
-                const { error } = await supabase
-                    .from('products')
-                    .update({
-                        name: info.name,
-                        current_price: info.price,
-                        currency: info.currency,
-                        image_url: info.image || null,
-                        status: 'tracking'
-                    })
-                    .eq('id', product.id)
-
-                if (error) throw error
-
-                // Refresh the local list
-                setProducts(prev =>
-                    prev.map(p => p.id === product.id ? {
-                        ...p,
-                        name: info.name,
-                        current_price: info.price,
-                        currency: info.currency,
-                        image_url: info.image || null,
-                        status: 'tracking'
-                    } : p)
-                )
-            } else {
-                // Mark as failed
-                await supabase
-                    .from('products')
-                    .update({ status: 'failed' })
-                    .eq('id', product.id)
-
-                setProducts(prev =>
-                    prev.map(p => p.id === product.id ? { ...p, status: 'failed' } : p)
-                )
-            }
+            setProducts(prev =>
+                prev.map(p => p.id === product.id ? { ...p, status: 'queued' } : p)
+            )
         } catch {
-            // Ignore background error
+            // Mark as pending if update fails
+            setProducts(prev =>
+                prev.map(p => p.id === product.id ? { ...p, status: 'pending' } : p)
+            )
         }
-    }, []) // supabase removed from deps
+    }, [])
 
     // Background scraping handler
     useEffect(() => {
@@ -185,13 +153,13 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 overflow-hidden">
                                     <div className="text-sm font-semibold group-hover:text-[#FF9EB5] transition-colors flex items-center gap-2 text-[#EDEDED] line-clamp-2 leading-snug">
-                                        {product.status === 'scraping' && <Loader2 className="w-4 h-4 text-[#FF9EB5] animate-spin shrink-0" />}
+                                        {(product.status === 'scraping' || product.status === 'queued') && <Loader2 className="w-4 h-4 text-[#FF9EB5] animate-spin shrink-0" />}
                                         {product.status === 'failed' && <AlertCircle className="w-4 h-4 text-orange-400 shrink-0" />}
                                         <span className="break-words">{product.name}</span>
                                     </div>
-                                    {product.status === 'scraping' && (
-                                        <Badge className="bg-[#FF9EB5]/20 text-[#FF9EB5] border-[#FF9EB5]/30 animate-pulse text-[10px] py-0 px-1">
-                                            SCRAPING
+                                    {(product.status === 'scraping' || product.status === 'queued') && (
+                                        <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-[10px] py-0 px-1">
+                                            QUEUED
                                         </Badge>
                                     )}
                                 </div>
