@@ -25,9 +25,9 @@ const STORE_CONFIGS: Record<string, Array<{
         { name: 'Walmart', searchUrl: (q) => `https://www.walmart.com/search?q=${encodeURIComponent(q)}`, priceSelector: '[data-automation-id="product-price"] span', waitSelector: '[data-item-id]' }
     ],
     'GBP': [
-        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.co.uk/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', waitSelector: '[data-component-type="s-search-result"]' },
-        { name: 'eBay', searchUrl: (q) => `https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', waitSelector: '.s-item' },
-        { name: 'Argos', searchUrl: (q) => `https://www.argos.co.uk/search/${encodeURIComponent(q)}`, priceSelector: '[data-test="product-card-price"]', waitSelector: '[data-test="product-card"]' }
+        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.co.uk/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole, span.a-price', waitSelector: '[data-component-type="s-search-result"]' },
+        { name: 'eBay', searchUrl: (q) => `https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price, .x-price-primary span, [data-testid="item-price"]', waitSelector: '.srp-results' },
+        { name: 'Argos', searchUrl: (q) => `https://www.argos.co.uk/search/${encodeURIComponent(q)}/`, priceSelector: '[data-test="product-card-price"], .ProductCardstyles__Price, [class*="Price"]', waitSelector: '[data-test="component-product-card"]' }
     ],
     'EUR': [
         { name: 'Amazon', searchUrl: (q) => `https://www.amazon.de/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', waitSelector: '[data-component-type="s-search-result"]' },
@@ -60,7 +60,7 @@ interface ScrapedProduct {
     image_url?: string
 }
 
-async function scrapeWithPuppeteer(url: string, priceSelector: string, waitSelector?: string): Promise<{ price: number; currency: string } | null> {
+async function scrapeWithPuppeteer(url: string, priceSelector: string, waitSelector?: string, expectedCurrency: string = 'USD'): Promise<{ price: number; currency: string } | null> {
     let browser
     try {
         browser = await puppeteer.launch({
@@ -86,20 +86,27 @@ async function scrapeWithPuppeteer(url: string, priceSelector: string, waitSelec
         // Extra wait for dynamic content
         await new Promise(r => setTimeout(r, 2000))
 
-        // Extract price
+        // Extract price - just get the number, use expected currency
         const priceData = await page.evaluate((selector) => {
             const elements = document.querySelectorAll(selector)
             for (const el of elements) {
                 const text = el.textContent?.trim() || ''
                 if (text) {
-                    const match = text.match(/[$£€]?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?|\d+(?:\.\d{2})?)/)
+                    // Match price patterns - handle different formats
+                    const match = text.match(/[\$£€]?\s*(\d{1,3}(?:[,.\s]\d{3})*(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?)/)
                     if (match) {
-                        const price = parseFloat(match[1].replace(/,/g, ''))
+                        // Normalize price - handle both 1,234.56 and 1.234,56 formats
+                        let priceStr = match[1].replace(/\s/g, '')
+                        // If comma is the decimal separator (EU format like 12,99)
+                        if (priceStr.match(/,\d{2}$/) && !priceStr.includes('.')) {
+                            priceStr = priceStr.replace(',', '.')
+                        } else {
+                            // Remove thousand separators
+                            priceStr = priceStr.replace(/,/g, '')
+                        }
+                        const price = parseFloat(priceStr)
                         if (price > 0 && price < 100000) {
-                            let currency = 'USD'
-                            if (text.includes('£')) currency = 'GBP'
-                            else if (text.includes('€')) currency = 'EUR'
-                            return { price, currency }
+                            return { price }
                         }
                     }
                 }
@@ -107,7 +114,10 @@ async function scrapeWithPuppeteer(url: string, priceSelector: string, waitSelec
             return null
         }, priceSelector)
 
-        return priceData
+        if (priceData) {
+            return { price: priceData.price, currency: expectedCurrency }
+        }
+        return null
     } catch (err) {
         console.error(`Puppeteer scrape failed for ${url}:`, err)
         return null
@@ -156,7 +166,8 @@ async function scrapeComparisonPrices(productName: string, productId: string, cu
             const searchUrl = store.searchUrl(cleanQuery)
             console.log(`  → Checking ${store.name}...`)
 
-            const result = await scrapeWithPuppeteer(searchUrl, store.priceSelector, store.waitSelector)
+            // Pass expected currency so the result uses the correct currency
+            const result = await scrapeWithPuppeteer(searchUrl, store.priceSelector, store.waitSelector, currency)
 
             if (result && result.price > 0) {
                 console.log(`    ✅ Found price: ${result.currency} ${result.price}`)
