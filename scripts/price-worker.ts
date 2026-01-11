@@ -15,6 +15,72 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
+// Calculate Levenshtein distance for string similarity
+function levenshteinDistance(str1: string, str2: string): number {
+    const s1 = str1.toLowerCase()
+    const s2 = str2.toLowerCase()
+    const len1 = s1.length
+    const len2 = s2.length
+
+    const matrix: number[][] = []
+
+    for (let i = 0; i <= len1; i++) {
+        matrix[i] = [i]
+    }
+
+    for (let j = 0; j <= len2; j++) {
+        matrix[0][j] = j
+    }
+
+    for (let i = 1; i <= len1; i++) {
+        for (let j = 1; j <= len2; j++) {
+            const cost = s1[i - 1] === s2[j - 1] ? 0 : 1
+            matrix[i][j] = Math.min(
+                matrix[i - 1][j] + 1,
+                matrix[i][j - 1] + 1,
+                matrix[i - 1][j - 1] + cost
+            )
+        }
+    }
+
+    return matrix[len1][len2]
+}
+
+// Calculate similarity score (0-1, where 1 is identical)
+function calculateSimilarity(str1: string, str2: string): number {
+    const maxLen = Math.max(str1.length, str2.length)
+    if (maxLen === 0) return 1.0
+    const distance = levenshteinDistance(str1, str2)
+    return 1 - distance / maxLen
+}
+
+// Extract keywords from product name (excluding common words)
+function extractKeywords(name: string): string[] {
+    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'with', 'for', 'on', 'at', 'to', 'from', 'by', 'of', 'as'])
+    return name
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 2 && !stopWords.has(w))
+}
+
+// Calculate keyword overlap score
+function calculateKeywordScore(targetName: string, resultTitle: string): number {
+    const targetKeywords = new Set(extractKeywords(targetName))
+    const resultKeywords = extractKeywords(resultTitle)
+
+    if (targetKeywords.size === 0) return 0
+
+    let matches = 0
+    for (const keyword of resultKeywords) {
+        if (targetKeywords.has(keyword)) {
+            matches++
+        }
+    }
+
+    return matches / targetKeywords.size
+}
+
 // Extract key specifications from product name for better search matching
 function extractProductSpecs(name: string): { brand: string; specs: string[]; cleanName: string } {
     const specs: string[] = []
@@ -47,39 +113,40 @@ const STORE_CONFIGS: Record<string, Array<{
     name: string
     searchUrl: (query: string) => string
     priceSelector: string
+    titleSelector: string
     waitSelector: string
 }>> = {
     'USD': [
-        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.com/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', waitSelector: '[data-component-type="s-search-result"]' },
-        { name: 'eBay', searchUrl: (q) => `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', waitSelector: '.s-item' },
-        { name: 'Walmart', searchUrl: (q) => `https://www.walmart.com/search?q=${encodeURIComponent(q)}`, priceSelector: '[data-automation-id="product-price"] span', waitSelector: '[data-item-id]' },
-        { name: 'Target', searchUrl: (q) => `https://www.target.com/s?searchTerm=${encodeURIComponent(q)}`, priceSelector: '[data-test="current-price"]', waitSelector: '[data-test="product-card"]' },
-        { name: 'Best Buy', searchUrl: (q) => `https://www.bestbuy.com/site/searchpage.jsp?st=${encodeURIComponent(q)}`, priceSelector: '.priceView-customer-price span', waitSelector: '.sku-item' }
+        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.com/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', titleSelector: 'h2 a span, h2 span', waitSelector: '[data-component-type="s-search-result"]' },
+        { name: 'eBay', searchUrl: (q) => `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', titleSelector: '.s-item__title', waitSelector: '.s-item' },
+        { name: 'Walmart', searchUrl: (q) => `https://www.walmart.com/search?q=${encodeURIComponent(q)}`, priceSelector: '[data-automation-id="product-price"] span', titleSelector: '[data-automation-id="product-title"]', waitSelector: '[data-item-id]' },
+        { name: 'Target', searchUrl: (q) => `https://www.target.com/s?searchTerm=${encodeURIComponent(q)}`, priceSelector: '[data-test="current-price"]', titleSelector: '[data-test="product-title"]', waitSelector: '[data-test="product-card"]' },
+        { name: 'Best Buy', searchUrl: (q) => `https://www.bestbuy.com/site/searchpage.jsp?st=${encodeURIComponent(q)}`, priceSelector: '.priceView-customer-price span', titleSelector: '.sku-title', waitSelector: '.sku-item' }
     ],
     'GBP': [
-        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.co.uk/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole, span.a-price', waitSelector: '[data-component-type="s-search-result"]' },
-        { name: 'eBay', searchUrl: (q) => `https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price, .s-card__price, .x-price-primary span', waitSelector: '.s-item, .s-card' },
-        { name: 'Argos', searchUrl: (q) => `https://www.argos.co.uk/search/${encodeURIComponent(q)}/`, priceSelector: '[data-test="component-product-card-price"], .ProductCardstyles__Price', waitSelector: '[data-test="component-product-card"]' },
-        { name: 'John Lewis', searchUrl: (q) => `https://www.johnlewis.com/search?search-term=${encodeURIComponent(q)}`, priceSelector: '.price, [class*="price"]', waitSelector: '[data-testid="product-card"]' },
-        { name: 'PriceRunner', searchUrl: (q) => `https://www.pricerunner.com/results?q=${encodeURIComponent(q)}`, priceSelector: 'a[href*="/pl/"] span', waitSelector: 'a[href*="/pl/"]' }
+        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.co.uk/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole, span.a-price', titleSelector: 'h2 a span, h2 span', waitSelector: '[data-component-type="s-search-result"]' },
+        { name: 'eBay', searchUrl: (q) => `https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price, .s-card__price, .x-price-primary span', titleSelector: '.s-item__title', waitSelector: '.s-item, .s-card' },
+        { name: 'Argos', searchUrl: (q) => `https://www.argos.co.uk/search/${encodeURIComponent(q)}/`, priceSelector: '[data-test="component-product-card-price"], .ProductCardstyles__Price', titleSelector: '[data-test="component-product-card-title"]', waitSelector: '[data-test="component-product-card"]' },
+        { name: 'John Lewis', searchUrl: (q) => `https://www.johnlewis.com/search?search-term=${encodeURIComponent(q)}`, priceSelector: '.price, [class*="price"]', titleSelector: '[data-testid="product-title"]', waitSelector: '[data-testid="product-card"]' },
+        { name: 'PriceRunner', searchUrl: (q) => `https://www.pricerunner.com/results?q=${encodeURIComponent(q)}`, priceSelector: 'a[href*="/pl/"] span', titleSelector: 'a[href*="/pl/"]', waitSelector: 'a[href*="/pl/"]' }
     ],
     'EUR': [
-        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.de/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', waitSelector: '[data-component-type="s-search-result"]' },
-        { name: 'eBay', searchUrl: (q) => `https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', waitSelector: '.s-item' },
-        { name: 'Idealo', searchUrl: (q) => `https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(q)}`, priceSelector: '[data-testid="price"]', waitSelector: '[data-testid="product-item"]' },
-        { name: 'MediaMarkt', searchUrl: (q) => `https://www.mediamarkt.de/de/search.html?query=${encodeURIComponent(q)}`, priceSelector: '[data-test="price"]', waitSelector: '[data-test="product-tile"]' }
+        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.de/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', titleSelector: 'h2 a span, h2 span', waitSelector: '[data-component-type="s-search-result"]' },
+        { name: 'eBay', searchUrl: (q) => `https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', titleSelector: '.s-item__title', waitSelector: '.s-item' },
+        { name: 'Idealo', searchUrl: (q) => `https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(q)}`, priceSelector: '[data-testid="price"]', titleSelector: '[data-testid="product-title"]', waitSelector: '[data-testid="product-item"]' },
+        { name: 'MediaMarkt', searchUrl: (q) => `https://www.mediamarkt.de/de/search.html?query=${encodeURIComponent(q)}`, priceSelector: '[data-test="price"]', titleSelector: '[data-test="product-name"]', waitSelector: '[data-test="product-tile"]' }
     ],
     'CAD': [
-        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.ca/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', waitSelector: '[data-component-type="s-search-result"]' },
-        { name: 'eBay', searchUrl: (q) => `https://www.ebay.ca/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', waitSelector: '.s-item' },
-        { name: 'Best Buy CA', searchUrl: (q) => `https://www.bestbuy.ca/en-ca/search?search=${encodeURIComponent(q)}`, priceSelector: '[data-automation="product-price"]', waitSelector: '[data-automation="product-item"]' },
-        { name: 'Walmart CA', searchUrl: (q) => `https://www.walmart.ca/search?q=${encodeURIComponent(q)}`, priceSelector: '[data-automation="product-price"]', waitSelector: '[data-automation="product-item"]' }
+        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.ca/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', titleSelector: 'h2 a span, h2 span', waitSelector: '[data-component-type="s-search-result"]' },
+        { name: 'eBay', searchUrl: (q) => `https://www.ebay.ca/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', titleSelector: '.s-item__title', waitSelector: '.s-item' },
+        { name: 'Best Buy CA', searchUrl: (q) => `https://www.bestbuy.ca/en-ca/search?search=${encodeURIComponent(q)}`, priceSelector: '[data-automation="product-price"]', titleSelector: '[data-automation="product-title"]', waitSelector: '[data-automation="product-item"]' },
+        { name: 'Walmart CA', searchUrl: (q) => `https://www.walmart.ca/search?q=${encodeURIComponent(q)}`, priceSelector: '[data-automation="product-price"]', titleSelector: '[data-automation="product-title"]', waitSelector: '[data-automation="product-item"]' }
     ],
     'AUD': [
-        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.com.au/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', waitSelector: '[data-component-type="s-search-result"]' },
-        { name: 'eBay', searchUrl: (q) => `https://www.ebay.com.au/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', waitSelector: '.s-item' },
-        { name: 'Kogan', searchUrl: (q) => `https://www.kogan.com/au/search/?q=${encodeURIComponent(q)}`, priceSelector: '[data-testid="price"]', waitSelector: '[data-testid="product-card"]' },
-        { name: 'JB Hi-Fi', searchUrl: (q) => `https://www.jbhifi.com.au/search?q=${encodeURIComponent(q)}`, priceSelector: '.price', waitSelector: '.product-tile' }
+        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.com.au/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', titleSelector: 'h2 a span, h2 span', waitSelector: '[data-component-type="s-search-result"]' },
+        { name: 'eBay', searchUrl: (q) => `https://www.ebay.com.au/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', titleSelector: '.s-item__title', waitSelector: '.s-item' },
+        { name: 'Kogan', searchUrl: (q) => `https://www.kogan.com/au/search/?q=${encodeURIComponent(q)}`, priceSelector: '[data-testid="price"]', titleSelector: '[data-testid="product-title"]', waitSelector: '[data-testid="product-card"]' },
+        { name: 'JB Hi-Fi', searchUrl: (q) => `https://www.jbhifi.com.au/search?q=${encodeURIComponent(q)}`, priceSelector: '.price', titleSelector: '.product-title', waitSelector: '.product-tile' }
     ]
 }
 
@@ -95,6 +162,193 @@ interface ScrapedProduct {
     current_price: number
     currency: string
     image_url?: string
+}
+
+interface SearchResult {
+    title: string
+    price: number
+    url?: string
+    position: number
+}
+
+// Scrape multiple search results and find the best match
+async function scrapeSearchResults(
+    url: string,
+    priceSelector: string,
+    titleSelector: string,
+    waitSelector: string,
+    targetProductName: string,
+    referencePrice: number | null,
+    expectedCurrency: string = 'USD',
+    maxResults: number = 10
+): Promise<{ price: number; currency: string; title: string; score: number } | null> {
+    let browser
+    try {
+        browser = await puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        })
+
+        const page = await browser.newPage()
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        await page.setViewport({ width: 1920, height: 1080 })
+
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 })
+
+        // Wait for search results
+        try {
+            await page.waitForSelector(waitSelector, { timeout: 10000 })
+        } catch {
+            // Continue anyway
+        }
+
+        // Extra wait for dynamic content
+        await new Promise(r => setTimeout(r, 2000))
+
+        // Extract multiple results
+        const results = await page.evaluate((pSelector, tSelector, wSelector, maxRes) => {
+            const results: Array<{ title: string; price: number; position: number }> = []
+
+            // Find all result containers
+            const containers = document.querySelectorAll(wSelector)
+
+            for (let i = 0; i < Math.min(containers.length, maxRes); i++) {
+                const container = containers[i]
+
+                // Extract title from this result
+                let title = ''
+                const titleSelectors = [
+                    tSelector,
+                    'h2',
+                    'h3',
+                    '[data-testid="product-title"]',
+                    '[data-test="product-title"]',
+                    '.s-item__title',
+                    '.product-title',
+                    'a[href*="/"]'
+                ].filter(s => s) as string[]
+
+                for (const sel of titleSelectors) {
+                    const titleEl = container.querySelector(sel)
+                    if (titleEl?.textContent?.trim()) {
+                        title = titleEl.textContent.trim().substring(0, 150)
+                        break
+                    }
+                }
+
+                // Extract price from this result
+                let price = 0
+                const priceElements = container.querySelectorAll(pSelector)
+
+                for (const el of priceElements) {
+                    const text = el.textContent?.trim() || ''
+                    if (text) {
+                        const match = text.match(/[$£€]?\s*(\d{1,3}(?:[,.\s]\d{3})*(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?)/)
+                        if (match) {
+                            let priceStr = match[1].replace(/\s/g, '')
+
+                            // Handle EU format (comma as decimal separator)
+                            if (priceStr.match(/,\d{2}$/) && !priceStr.includes('.')) {
+                                priceStr = priceStr.replace(',', '.')
+                            } else {
+                                priceStr = priceStr.replace(/,/g, '')
+                            }
+
+                            const parsedPrice = parseFloat(priceStr)
+                            if (parsedPrice > 0 && parsedPrice < 100000) {
+                                price = parsedPrice
+                                break
+                            }
+                        }
+                    }
+                }
+
+                if (title && price > 0) {
+                    results.push({ title, price, position: i })
+                }
+            }
+
+            return results
+        }, priceSelector, titleSelector, waitSelector, maxResults)
+
+        if (!results || results.length === 0) {
+            return null
+        }
+
+        console.log(`    📊 Found ${results.length} results, scoring matches...`)
+
+        // Score each result
+        interface ScoredResult extends SearchResult {
+            score: number
+        }
+
+        const scoredResults: ScoredResult[] = results.map(result => {
+            // Calculate title similarity (0-1)
+            const titleSimilarity = calculateSimilarity(targetProductName, result.title)
+
+            // Calculate keyword overlap (0-1)
+            const keywordScore = calculateKeywordScore(targetProductName, result.title)
+
+            // Position score (first results are more relevant, score 0.5-1.0)
+            const positionScore = 1 - (result.position * 0.05)
+
+            // Price reasonableness score (if we have a reference price)
+            let priceScore = 0.5 // neutral if no reference
+            if (referencePrice && referencePrice > 0) {
+                const priceRatio = result.price / referencePrice
+                // Prefer prices within 50% to 150% of reference price
+                if (priceRatio >= 0.5 && priceRatio <= 1.5) {
+                    // Best score for prices close to reference
+                    priceScore = 1 - Math.abs(1 - priceRatio)
+                } else if (priceRatio < 0.5) {
+                    // Too cheap might be wrong product
+                    priceScore = 0.2
+                } else {
+                    // Too expensive might be bundle or wrong product
+                    priceScore = 0.3
+                }
+            }
+
+            // Weighted total score
+            const totalScore = (
+                titleSimilarity * 0.4 +
+                keywordScore * 0.3 +
+                positionScore * 0.2 +
+                priceScore * 0.1
+            )
+
+            return {
+                ...result,
+                score: totalScore
+            }
+        })
+
+        // Sort by score and take the best
+        scoredResults.sort((a, b) => b.score - a.score)
+
+        const bestMatch = scoredResults[0]
+
+        console.log(`    🏆 Best match: "${bestMatch.title.substring(0, 50)}..." (score: ${bestMatch.score.toFixed(2)}, price: ${expectedCurrency} ${bestMatch.price})`)
+
+        // Only return if score is above threshold (0.3 is reasonable)
+        if (bestMatch.score >= 0.3) {
+            return {
+                price: bestMatch.price,
+                currency: expectedCurrency,
+                title: bestMatch.title,
+                score: bestMatch.score
+            }
+        }
+
+        console.log(`    ⚠️ Best match score too low (${bestMatch.score.toFixed(2)}), rejecting`)
+        return null
+
+    } catch (err) {
+        console.error(`    ❌ Search scrape failed:`, err)
+        return null
+    } finally {
+        if (browser) await browser.close()
+    }
 }
 
 async function scrapeWithPuppeteer(url: string, priceSelector: string, waitSelector?: string, expectedCurrency: string = 'USD'): Promise<{ price: number; currency: string; title?: string } | null> {
@@ -149,7 +403,7 @@ async function scrapeWithPuppeteer(url: string, priceSelector: string, waitSelec
             }
 
             // Get price
-            const elements = document.querySelectorAll(selector)
+            const elements = Array.from(document.querySelectorAll(selector))
             for (const el of elements) {
                 const text = el.textContent?.trim() || ''
                 if (text) {
@@ -187,7 +441,7 @@ async function scrapeWithPuppeteer(url: string, priceSelector: string, waitSelec
     }
 }
 
-async function scrapeProductPrice(url: string, expectedCurrency: string = 'USD'): Promise<{ price: number; currency: string } | null> {
+async function scrapeProductPrice(url: string, expectedCurrency: string = 'USD'): Promise<{ price: number; currency: string; title?: string } | null> {
     // Determine which selectors to use based on the URL
     let selectors: string
     let waitSelector: string | undefined
@@ -283,7 +537,7 @@ async function scrapeProductPrice(url: string, expectedCurrency: string = 'USD')
     return scrapeWithPuppeteer(url, selectors, waitSelector, expectedCurrency)
 }
 
-async function scrapeComparisonPrices(productName: string, productId: string, currency: string): Promise<void> {
+async function scrapeComparisonPrices(productName: string, productId: string, currency: string, referencePrice: number | null = null): Promise<void> {
     // Extract specs from product name for more accurate searching
     const { brand, specs } = extractProductSpecs(productName)
 
@@ -303,6 +557,9 @@ async function scrapeComparisonPrices(productName: string, productId: string, cu
     const cleanQuery = [...keyWords, ...specTerms].join(' ')
 
     console.log(`🔍 Searching comparison prices for: "${cleanQuery}" (${currency})`)
+    if (referencePrice) {
+        console.log(`   Reference price: ${currency} ${referencePrice}`)
+    }
 
     const stores = getStoresForCurrency(currency)
 
@@ -311,11 +568,20 @@ async function scrapeComparisonPrices(productName: string, productId: string, cu
             const searchUrl = store.searchUrl(cleanQuery)
             console.log(`  → Checking ${store.name}...`)
 
-            // Pass expected currency so the result uses the correct currency
-            const result = await scrapeWithPuppeteer(searchUrl, store.priceSelector, store.waitSelector, currency)
+            // Use intelligent multi-result scraping with product matching
+            const result = await scrapeSearchResults(
+                searchUrl,
+                store.priceSelector,
+                store.titleSelector,
+                store.waitSelector,
+                productName,
+                referencePrice,
+                currency,
+                10 // Check up to 10 results
+            )
 
             if (result && result.price > 0) {
-                console.log(`    ✅ Found price: ${result.currency} ${result.price}`)
+                console.log(`    ✅ Match found: ${result.currency} ${result.price}`)
 
                 // Upsert comparison price
                 await supabase
@@ -330,7 +596,7 @@ async function scrapeComparisonPrices(productName: string, productId: string, cu
                         is_available: true
                     }, { onConflict: 'product_id,store_name' })
             } else {
-                console.log(`    ⚠️ No price found`)
+                console.log(`    ⚠️ No matching product found`)
 
                 // Update as unavailable but keep link
                 await supabase
@@ -495,7 +761,8 @@ async function runPriceCheck() {
             }
 
             // Step 2: Only scrape comparison prices if main product succeeded
-            await scrapeComparisonPrices(productName, product.id, productCurrency)
+            // Pass the current price as reference for better matching
+            await scrapeComparisonPrices(productName, product.id, productCurrency, newPrice)
         } else {
             console.warn(`   ⚠️ Could not scrape main product price - skipping comparisons`)
             await supabase
