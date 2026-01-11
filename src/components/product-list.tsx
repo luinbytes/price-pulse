@@ -182,13 +182,13 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
                             className="flex items-center justify-between p-4 rounded-lg bg-[#0A0A0A] border border-[#2A2A2A] hover:border-[#FF9EB5] transition-colors cursor-pointer"
                             onClick={() => onProductSelect?.(product)}
                         >
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                    <CardTitle className="text-sm font-semibold truncate group-hover:text-[#FF9EB5] transition-colors flex items-center gap-2 text-[#EDEDED]">
-                                        {product.status === 'scraping' && <Loader2 className="w-4 h-4 text-[#FF9EB5] animate-spin" />}
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 overflow-hidden">
+                                    <div className="text-sm font-semibold group-hover:text-[#FF9EB5] transition-colors flex items-center gap-2 text-[#EDEDED] line-clamp-2 leading-snug">
+                                        {product.status === 'scraping' && <Loader2 className="w-4 h-4 text-[#FF9EB5] animate-spin shrink-0" />}
                                         {product.status === 'failed' && <AlertCircle className="w-4 h-4 text-orange-400 shrink-0" />}
-                                        {product.name}
-                                    </CardTitle>
+                                        <span className="break-words">{product.name}</span>
+                                    </div>
                                     {product.status === 'scraping' && (
                                         <Badge className="bg-[#FF9EB5]/20 text-[#FF9EB5] border-[#FF9EB5]/30 animate-pulse text-[10px] py-0 px-1">
                                             SCRAPING
@@ -210,8 +210,8 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
                                     )}
                                 </p>
                             </div>
-                            <div className="flex items-center gap-4">
-                                <div className="text-right">
+                            <div className="flex items-center gap-4 shrink-0 px-2 ml-4 border-l border-[#2A2A2A]">
+                                <div className="text-right min-w-[80px]">
                                     <p className="text-xl font-bold text-[#FF9EB5]">
                                         {formatCurrency(product.current_price, product.currency)}
                                     </p>

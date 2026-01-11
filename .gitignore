@@ -11,8 +11,9 @@ node_modules
 dist
 dist-ssr
 *.local
-.env.backup
-todo.md
+.env
+.env.*
+!.env.example
 
 # Editor directories and files
 .vscode/*
@@ -24,7 +25,16 @@ todo.md
 *.njsproj
 *.sln
 *.sw?
+
+# Project specific
 schema_dump.sql
+todo.md
+.env.backup
+
+# Puppeteer
+.cache/puppeteer
+
+# Gemini/System
 .system_generated/
 .gemini/
 brain/

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { AuthProvider, useAuth } from './lib/auth'
 import { Toaster } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
@@ -172,7 +172,9 @@ function Dashboard() {
                   {displayName[0]}
                 </div>
               )}
-              <span className="text-sm text-[#EDEDED] font-medium hidden md:block">{displayName}</span>
+              <span className="text-sm text-[#EDEDED] font-medium hidden md:block truncate max-w-[120px] lg:max-w-[200px]" title={displayName as string}>
+                {displayName}
+              </span>
             </div>
             <Button
               variant="ghost"

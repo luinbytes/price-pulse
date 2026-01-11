@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import * as cheerio from 'cheerio'
-import fetch from 'node-fetch'
+import puppeteer from 'puppeteer'
 
 // Configuration
 const SUPABASE_URL = process.env.SUPABASE_URL || ''
@@ -13,73 +12,174 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-async function scrapePrice(url: string): Promise<{ price: number; currency: string } | null> {
+// Store configurations for comparison scraping
+const COMPARISON_STORES = [
+    {
+        name: 'Amazon',
+        searchUrl: (query: string) => `https://www.amazon.com/s?k=${encodeURIComponent(query)}`,
+        icon: '📦',
+        priceSelector: '.a-price .a-offscreen, .a-price-whole, [data-a-color="price"] .a-offscreen',
+        waitSelector: '[data-component-type="s-search-result"]'
+    },
+    {
+        name: 'eBay',
+        searchUrl: (query: string) => `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`,
+        icon: '🏷️',
+        priceSelector: '.s-item__price',
+        waitSelector: '.s-item'
+    },
+    {
+        name: 'Walmart',
+        searchUrl: (query: string) => `https://www.walmart.com/search?q=${encodeURIComponent(query)}`,
+        icon: '🛒',
+        priceSelector: '[data-automation-id="product-price"] span',
+        waitSelector: '[data-item-id]'
+    }
+]
+
+interface ScrapedProduct {
+    id: string
+    user_id: string
+    name: string
+    url: string
+    current_price: number
+    currency: string
+    image_url?: string
+}
+
+async function scrapeWithPuppeteer(url: string, priceSelector: string, waitSelector?: string): Promise<{ price: number; currency: string } | null> {
+    let browser
     try {
-        const response = await fetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
+        browser = await puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
         })
 
-        if (!response.ok) return null
+        const page = await browser.newPage()
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        await page.setViewport({ width: 1920, height: 1080 })
 
-        const html = await response.text()
-        const $ = cheerio.load(html)
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 })
 
-        let price: number | null = null
-        let currency = 'USD'
-
-        // 1. Try meta tags
-        const priceMeta = $('meta[property="product:price:amount"]').attr('content') ||
-            $('meta[property="og:price:amount"]').attr('content')
-
-        const currencyMeta = $('meta[property="product:price:currency"]').attr('content') ||
-            $('meta[property="og:price:currency"]').attr('content')
-
-        if (priceMeta) {
-            const num = parseFloat(priceMeta.replace(/[^0-9.]/g, ''))
-            if (!isNaN(num)) price = num
+        // Wait for content to load
+        if (waitSelector) {
+            try {
+                await page.waitForSelector(waitSelector, { timeout: 10000 })
+            } catch {
+                // Continue anyway
+            }
         }
-        if (currencyMeta) currency = currencyMeta
 
-        // 2. Try common selectors if meta failed
-        if (price === null) {
-            const selectors = [
-                '.a-price-whole', '#priceblock_ourprice', '#priceblock_dealprice', // Amazon
-                '.price-item--sale', '.price-item--regular', // Shopify
-                '[data-testid="price-label"]', '.price'
-            ]
+        // Extra wait for dynamic content
+        await new Promise(r => setTimeout(r, 2000))
 
-            for (const selector of selectors) {
-                const text = $(selector).first().text().trim()
+        // Extract price
+        const priceData = await page.evaluate((selector) => {
+            const elements = document.querySelectorAll(selector)
+            for (const el of elements) {
+                const text = el.textContent?.trim() || ''
                 if (text) {
-                    const num = parseFloat(text.replace(/[^0-9.]/g, ''))
-                    if (!isNaN(num)) {
-                        price = num
-                        if (text.includes('$')) currency = 'USD'
-                        else if (text.includes('€')) currency = 'EUR'
-                        else if (text.includes('£')) currency = 'GBP'
-                        break
+                    const match = text.match(/[$£€]?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?|\d+(?:\.\d{2})?)/)
+                    if (match) {
+                        const price = parseFloat(match[1].replace(/,/g, ''))
+                        if (price > 0 && price < 100000) {
+                            let currency = 'USD'
+                            if (text.includes('£')) currency = 'GBP'
+                            else if (text.includes('€')) currency = 'EUR'
+                            return { price, currency }
+                        }
                     }
                 }
             }
-        }
+            return null
+        }, priceSelector)
 
-        return price !== null ? { price, currency } : null
+        return priceData
     } catch (err) {
-        console.error(`Scraping failed for ${url}:`, err)
+        console.error(`Puppeteer scrape failed for ${url}:`, err)
         return null
+    } finally {
+        if (browser) await browser.close()
     }
 }
 
-interface ScrapedProduct {
-    id: string;
-    user_id: string;
-    name: string;
-    url: string;
-    current_price: number;
-    currency: string;
-    image_url?: string;
+async function scrapeProductPrice(url: string): Promise<{ price: number; currency: string } | null> {
+    // Use common selectors for product pages
+    const selectors = [
+        // Meta tags (most reliable)
+        'meta[property="product:price:amount"]',
+        'meta[property="og:price:amount"]',
+        // Common price selectors
+        '.a-price .a-offscreen',
+        '.a-price-whole',
+        '#priceblock_ourprice',
+        '#priceblock_dealprice',
+        '.price-item--sale',
+        '.price-item--regular',
+        '[data-testid="price"]',
+        '.product-price',
+        '.price'
+    ].join(', ')
+
+    return scrapeWithPuppeteer(url, selectors)
+}
+
+async function scrapeComparisonPrices(productName: string, productId: string): Promise<void> {
+    // Clean query - take first 5 meaningful words
+    const cleanQuery = productName
+        .replace(/[^\w\s-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .split(' ')
+        .slice(0, 5)
+        .join(' ')
+
+    console.log(`🔍 Searching comparison prices for: "${cleanQuery}"`)
+
+    for (const store of COMPARISON_STORES) {
+        try {
+            const searchUrl = store.searchUrl(cleanQuery)
+            console.log(`  → Checking ${store.name}...`)
+
+            const result = await scrapeWithPuppeteer(searchUrl, store.priceSelector, store.waitSelector)
+
+            if (result && result.price > 0) {
+                console.log(`    ✅ Found price: ${result.currency} ${result.price}`)
+
+                // Upsert comparison price
+                await supabase
+                    .from('comparison_prices')
+                    .upsert({
+                        product_id: productId,
+                        store_name: store.name,
+                        store_url: searchUrl,
+                        price: result.price,
+                        currency: result.currency,
+                        last_checked: new Date().toISOString(),
+                        is_available: true
+                    }, { onConflict: 'product_id,store_name' })
+            } else {
+                console.log(`    ⚠️ No price found`)
+
+                // Update as unavailable but keep link
+                await supabase
+                    .from('comparison_prices')
+                    .upsert({
+                        product_id: productId,
+                        store_name: store.name,
+                        store_url: searchUrl,
+                        price: null,
+                        last_checked: new Date().toISOString(),
+                        is_available: false
+                    }, { onConflict: 'product_id,store_name' })
+            }
+
+            // Rate limiting - wait between stores
+            await new Promise(r => setTimeout(r, 3000))
+        } catch (err) {
+            console.error(`    ❌ Error scraping ${store.name}:`, err)
+        }
+    }
 }
 
 async function sendDiscordNotification(webhookUrl: string, product: ScrapedProduct, oldPrice: number, newPrice: number) {
@@ -91,7 +191,7 @@ async function sendDiscordNotification(webhookUrl: string, product: ScrapedProdu
             title: '🚨 Price Drop Alert!',
             description: `**${product.name}** just dropped in price!`,
             url: product.url,
-            color: 0xFF9EB5, // PricePulse Pink
+            color: 0xFF9EB5,
             fields: [
                 { name: 'Old Price', value: `${product.currency} ${oldPrice.toFixed(2)}`, inline: true },
                 { name: 'New Price', value: `${product.currency} ${newPrice.toFixed(2)}`, inline: true },
@@ -115,7 +215,9 @@ async function sendDiscordNotification(webhookUrl: string, product: ScrapedProdu
 }
 
 async function runPriceCheck() {
-    console.log('--- PricePulse Worker Start ---')
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.log('🚀 PricePulse Worker Start')
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
     // 1. Fetch all products with URLs
     const { data: products, error } = await supabase
@@ -128,11 +230,13 @@ async function runPriceCheck() {
         return
     }
 
-    console.log(`Checking ${products?.length || 0} products...`)
+    console.log(`📦 Found ${products?.length || 0} products to check\n`)
 
     for (const product of products || []) {
-        console.log(`Checking: ${product.name}...`)
-        const result = await scrapePrice(product.url!)
+        console.log(`\n📍 Processing: ${product.name.substring(0, 50)}...`)
+
+        // Step 1: Scrape main product price
+        const result = await scrapeProductPrice(product.url!)
 
         if (result) {
             const oldPrice = product.current_price
@@ -141,19 +245,17 @@ async function runPriceCheck() {
             // Update last_checked
             await supabase
                 .from('products')
-                .update({ last_checked: new Date().toISOString() })
+                .update({ last_checked: new Date().toISOString(), status: 'tracking' })
                 .eq('id', product.id)
 
             if (oldPrice && newPrice < oldPrice) {
-                console.log(`🤑 Price drop found for ${product.name}: ${oldPrice} -> ${newPrice}`)
+                console.log(`   🤑 PRICE DROP: ${oldPrice} → ${newPrice}`)
 
-                // Update product current price
                 await supabase
                     .from('products')
                     .update({ current_price: newPrice })
                     .eq('id', product.id)
 
-                // Insert history
                 await supabase
                     .from('price_history')
                     .insert({
@@ -163,7 +265,7 @@ async function runPriceCheck() {
                         source: 'price_worker_automation'
                     })
 
-                // Fetch User Settings for Discord Webhook
+                // Send Discord notification
                 const { data: settings } = await supabase
                     .from('user_settings')
                     .select('discord_webhook')
@@ -171,11 +273,10 @@ async function runPriceCheck() {
                     .single()
 
                 if (settings?.discord_webhook) {
-                    console.log(`🔔 Sending Discord alert to user ${product.user_id}...`)
+                    console.log(`   🔔 Sending Discord alert...`)
                     await sendDiscordNotification(settings.discord_webhook, product, oldPrice, newPrice)
                 }
             } else if (!oldPrice || newPrice !== oldPrice) {
-                // If no history yet, record current price as first history entry if changed
                 await supabase
                     .from('products')
                     .update({ current_price: newPrice })
@@ -191,11 +292,23 @@ async function runPriceCheck() {
                     })
             }
         } else {
-            console.warn(`⚠️ Could not scrape price for: ${product.name}`)
+            console.warn(`   ⚠️ Could not scrape main product price`)
+            await supabase
+                .from('products')
+                .update({ status: 'scrape_failed' })
+                .eq('id', product.id)
         }
+
+        // Step 2: Scrape comparison prices from other stores
+        await scrapeComparisonPrices(product.name, product.id)
+
+        // Rate limiting between products
+        await new Promise(r => setTimeout(r, 5000))
     }
 
-    console.log('--- PricePulse Worker Complete ---')
+    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.log('✅ PricePulse Worker Complete')
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 }
 
 runPriceCheck()

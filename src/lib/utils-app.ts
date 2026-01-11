@@ -1,20 +1,42 @@
 export async function scrapeProductInfo(url: string, defaultCurrency: string = 'USD') {
-    // List of CORS proxies to try
+    // List of CORS proxies - prioritized by CORS reliability (JSON-wrapping proxies first)
     const proxies = [
+        (u: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`, // JSON-wrapped bypasses CORS best
         (u: string) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
         (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
-        (u: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`
+        (u: string) => `https://cors-anywhere.herokuapp.com/${u}`, // Fallback
+        (u: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}` // Repeat for rotation
     ]
 
-    for (const getProxyUrl of proxies) {
+    // Determine if we should try the mobile version (Amazon specific trick)
+    let targetUrl = url;
+    if (url.includes('amazon.com') && !url.includes('m.amazon.com')) {
+        // Occasionally try mobile site which has lighter bot protection
+        if (Math.random() > 0.5) {
+            targetUrl = url.replace('www.amazon.com', 'm.amazon.com');
+        }
+    }
+
+    for (let i = 0; i < proxies.length; i++) {
+        const getProxyUrl = proxies[i]
         try {
-            const proxyUrl = getProxyUrl(url)
+            if (i > 0) {
+                await new Promise(resolve => setTimeout(resolve, i * 300 + Math.random() * 200))
+            }
+
+            const proxyUrl = getProxyUrl(targetUrl)
+
+            // Simplified fetch to avoid preflight (no custom headers)
             const response = await fetch(proxyUrl, {
-                // allorigins needs no-cache sometimes to avoid stale 403s
                 cache: 'no-store'
             })
 
-            if (!response.ok) continue // Try next proxy
+            if (!response.ok) {
+                if (response.status === 429 || response.status === 503) {
+                    console.warn(`Scraper: Proxy ${i} throttled (Status ${response.status})`)
+                }
+                continue
+            }
 
             let html = ''
             if (proxyUrl.includes('allorigins.win')) {
@@ -24,11 +46,13 @@ export async function scrapeProductInfo(url: string, defaultCurrency: string = '
                 html = await response.text()
             }
 
-            if (!html || html.length < 100) continue
+            if (!html || html.length < 500) continue
 
-            // Basic check for anti-bot pages
-            if (html.includes('api-services-support@amazon.com') || html.includes('captcha')) {
-                console.warn('Scraper: Blocked by bot protection on this proxy')
+            // Enhanced check for anti-bot pages
+            const botSignals = ['captcha', 'api-services-support@amazon.com', 'robot check', 'automated access']
+
+            if (botSignals.some(signal => html.toLowerCase().includes(signal))) {
+                console.warn(`Scraper: Blocked by bot protection on proxy ${i}`)
                 continue
             }
 
@@ -36,8 +60,31 @@ export async function scrapeProductInfo(url: string, defaultCurrency: string = '
             const parser = new DOMParser()
             const doc = parser.parseFromString(html, 'text/html')
 
-            // 1. Extract Name - use more specific selectors for big sites
-            let name = doc.querySelector('#productTitle')?.textContent?.trim() || // Amazon
+            // 1. Extract from JSON-LD (Structured Data) - Very reliable for Shopify/WooCommerce/BigCommerce
+            const jsonLdScripts = doc.querySelectorAll('script[type="application/ld+json"]')
+            let jsonName = '', jsonPrice: number | null = null, jsonCurrency = ''
+
+            for (const script of jsonLdScripts) {
+                try {
+                    const data = JSON.parse(script.textContent || '{}')
+                    const items = Array.isArray(data) ? data : [data]
+                    const productData = items.find(i => i['@type'] === 'Product' || i['@type']?.includes('Product'))
+
+                    if (productData) {
+                        if (!jsonName) jsonName = productData.name || ''
+                        const offers = Array.isArray(productData.offers) ? productData.offers : [productData.offers]
+                        const offer = offers.find((o: any) => o && (o.price || o.lowPrice))
+                        if (offer) {
+                            if (jsonPrice === null) jsonPrice = parseFloat(offer.price || offer.lowPrice)
+                            if (!jsonCurrency) jsonCurrency = offer.priceCurrency || ''
+                        }
+                    }
+                } catch { /* ignore */ }
+            }
+
+            // 2. Extract Name - use more specific selectors for big sites
+            let name = jsonName ||
+                doc.querySelector('#productTitle')?.textContent?.trim() || // Amazon
                 doc.querySelector('.product-title')?.textContent?.trim() || // eBay
                 doc.querySelector('h1.page-title')?.textContent?.trim() ||
                 doc.querySelector('meta[property="og:title"]')?.getAttribute('content') ||
@@ -58,36 +105,42 @@ export async function scrapeProductInfo(url: string, defaultCurrency: string = '
             }
             name = name.split('|')[0].split('-')[0].trim()
 
-            // 2. Extract Price & Currency
-            let price: number | null = null
-            let currency = defaultCurrency
+            // 3. Extract Price & Currency
+            let price: number | null = jsonPrice
+            let currency = jsonCurrency || defaultCurrency
 
-            // Try meta tags first
-            const priceMeta = doc.querySelector('meta[property="product:price:amount"]') ||
-                doc.querySelector('meta[property="og:price:amount"]') ||
-                doc.querySelector('meta[name="twitter:data1"]')
+            // Try meta tags if JSON-LD failed
+            if (price === null) {
+                const priceMeta = doc.querySelector('meta[property="product:price:amount"]') ||
+                    doc.querySelector('meta[property="og:price:amount"]') ||
+                    doc.querySelector('meta[name="twitter:data1"]') ||
+                    doc.querySelector('[itemprop="price"]')
 
-            const currencyMeta = doc.querySelector('meta[property="product:price:currency"]') ||
-                doc.querySelector('meta[property="og:price:currency"]')
-
-            if (priceMeta) {
-                const priceStr = priceMeta.getAttribute('content') || ''
-                const num = parseFloat(priceStr.replace(/[^0-9.]/g, ''))
-                if (!isNaN(num)) price = num
+                if (priceMeta) {
+                    const priceStr = priceMeta.getAttribute('content') || priceMeta.textContent || ''
+                    const num = parseFloat(priceStr.replace(/[^0-9.]/g, ''))
+                    if (!isNaN(num)) price = num
+                }
             }
 
-            if (currencyMeta) {
-                currency = currencyMeta.getAttribute('content') || currency
-            } else {
-                // Secondary check: look for og:locale or lang attribute
-                const locale = doc.querySelector('meta[property="og:locale"]')?.getAttribute('content') ||
-                    doc.documentElement.lang || '';
+            if (!jsonCurrency) {
+                const currencyMeta = doc.querySelector('meta[property="product:price:currency"]') ||
+                    doc.querySelector('meta[property="og:price:currency"]') ||
+                    doc.querySelector('[itemprop="priceCurrency"]')
 
-                if (locale.includes('GB') || url.includes('.co.uk')) currency = 'GBP';
-                else if (locale.includes('DE') || locale.includes('FR') || url.includes('.de') || url.includes('.fr')) currency = 'EUR';
-                else if (locale.includes('JP') || url.includes('.jp')) currency = 'JPY';
-                else if (locale.includes('CA') || url.includes('.ca')) currency = 'CAD';
-                else if (locale.includes('AU') || url.includes('.au')) currency = 'AUD';
+                if (currencyMeta) {
+                    currency = currencyMeta.getAttribute('content') || currencyMeta.textContent || currency
+                } else {
+                    // Secondary check: look for og:locale or lang attribute
+                    const locale = doc.querySelector('meta[property="og:locale"]')?.getAttribute('content') ||
+                        doc.documentElement.lang || '';
+
+                    if (locale.includes('GB') || url.includes('.co.uk')) currency = 'GBP';
+                    else if (locale.includes('DE') || locale.includes('FR') || url.includes('.de') || url.includes('.fr')) currency = 'EUR';
+                    else if (locale.includes('JP') || url.includes('.jp')) currency = 'JPY';
+                    else if (locale.includes('CA') || url.includes('.ca')) currency = 'CAD';
+                    else if (locale.includes('AU') || url.includes('.au')) currency = 'AUD';
+                }
             }
 
             // Fallback: If price not found in meta, look for common selectors
@@ -101,7 +154,10 @@ export async function scrapeProductInfo(url: string, defaultCurrency: string = '
                     '.priceToPay',
                     '.pp-price',
                     '[class*="price-actual"]',
-                    '[class*="price-item"]'
+                    '[class*="price-item"]',
+                    '.product-price',
+                    '[id*="price"]',
+                    '[class*="PriceDisplay"]'
                 ]
 
                 const pricePatterns = [
@@ -142,16 +198,36 @@ export async function scrapeProductInfo(url: string, defaultCurrency: string = '
                 }
             }
 
-            // 3. Extract Image
+            // Fallback 2: Regex search through all text (useful for search snippets)
+            if (price === null) {
+                const innerText = doc.body.innerText || ''
+                const priceRegex = /[\$£€]\d{1,4}(?:\.\d{2})?/g
+                const matches = innerText.match(priceRegex)
+                if (matches && matches.length > 0) {
+                    // Take the most likely price (often the first one in a snippet)
+                    const found = matches[0]
+                    price = parseFloat(found.replace(/[^0-9.]/g, ''))
+                    if (found.includes('$')) currency = 'USD'
+                    else if (found.includes('€')) currency = 'EUR'
+                    else if (found.includes('£')) currency = 'GBP'
+                }
+            }
+
+            // 4. Extract Image
             const image = doc.querySelector('meta[property="og:image"]')?.getAttribute('content') ||
                 doc.querySelector('meta[name="twitter:image"]')?.getAttribute('content') ||
                 doc.querySelector('#landingImage')?.getAttribute('src') ||
                 doc.querySelector('#imgBlkFront')?.getAttribute('src') ||
+                doc.querySelector('[itemprop="image"]')?.getAttribute('content') ||
+                doc.querySelector('.product-image img')?.getAttribute('src') ||
                 ''
+
+            // 5. Final Validation
+            if (price !== null && (isNaN(price) || price <= 0 || price > 1000000)) price = null
 
             // If we've got at least a name or price, return it
             if (name || price) {
-                return { name, price, currency, image, url }
+                return { name, price, currency, image, url: targetUrl }
             }
         } catch {
             // Silence intermediate errors to keep console clean if rotation is intended
@@ -164,46 +240,48 @@ export async function scrapeProductInfo(url: string, defaultCurrency: string = '
 }
 
 export async function searchProductPrices(query: string) {
-    const encodedQuery = encodeURIComponent(query)
+    // Tiered query simplification - move aggressive cleaning here
+    const cleanQuery = query.replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim()
+    const t1 = cleanQuery.split(' ').slice(0, 8).join(' ') // First 8 words max for stability
+    const t2 = cleanQuery.split(' ').slice(0, 4).join(' ') // First 4 words
+    const t3 = cleanQuery.split(' ')[0] // Just the brand/first word
+
     const targets = [
-        {
-            name: 'Amazon',
-            url: `https://www.amazon.com/s?k=${encodedQuery}`,
-            priceSelector: '.a-price .a-offscreen',
-            icon: '📦'
-        },
-        {
-            name: 'eBay',
-            url: `https://www.ebay.com/sch/i.html?_nkw=${encodedQuery}`,
-            priceSelector: '.s-item__price',
-            icon: '🏷️'
-        }
+        { name: 'Amazon', url: 'https://www.amazon.com/s?k=', icon: '📦' },
+        { name: 'eBay', url: 'https://www.ebay.com/sch/i.html?_nkw=', icon: '🏷️' },
+        { name: 'Google', url: 'https://www.google.com/search?tbm=shop&q=', icon: '🔍' }
     ]
 
-    const results = []
+    const results = await Promise.all(targets.map(async (target) => {
+        try {
+            // Tier 1: Detailed Search
+            let info = await scrapeProductInfo(target.url + encodeURIComponent(t1))
 
-    for (const target of targets) {
-        // Try the same proxy rotation strategy
-        const info = await scrapeProductInfo(target.url)
-        if (info && info.price) {
-            results.push({
-                store: target.name,
-                url: target.url,
-                price: info.price,
-                currency: info.currency,
-                icon: target.icon
-            })
-        } else {
-            // If full scrape fails, at least provide the link
-            results.push({
-                store: target.name,
-                url: target.url,
-                price: null,
-                currency: 'USD',
-                icon: target.icon
-            })
+            // Tier 2: Simplified Search
+            if (!info || !info.price) {
+                info = await scrapeProductInfo(target.url + encodeURIComponent(t2))
+            }
+
+            // Tier 3: Ultra-Simplified (Brand only) as last ditch attempt
+            if (!info || !info.price) {
+                info = await scrapeProductInfo(target.url + encodeURIComponent(t3))
+            }
+
+            if (info && info.price) {
+                return {
+                    store: target.name,
+                    url: info.url,
+                    price: info.price,
+                    currency: info.currency,
+                    icon: target.icon
+                }
+            }
+
+            return { store: target.name, url: target.url + encodeURIComponent(t1), price: null, currency: 'USD', icon: target.icon }
+        } catch {
+            return { store: target.name, url: target.url + encodeURIComponent(t1), price: null, currency: 'USD', icon: target.icon }
         }
-    }
+    }))
 
     return results
 }

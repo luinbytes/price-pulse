@@ -2,12 +2,13 @@ name: PricePulse Checker
 
 on:
   schedule:
-    - cron: '0 * * * *' # Every hour
+    - cron: '0 */2 * * *' # Every 2 hours
   workflow_dispatch: # Manual trigger
 
 jobs:
   check-prices:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       
@@ -19,6 +20,9 @@ jobs:
           
       - name: Install dependencies
         run: npm ci
+        
+      - name: Install Puppeteer dependencies
+        run: npx puppeteer browsers install chrome
         
       - name: Run Price Checker
         env:
