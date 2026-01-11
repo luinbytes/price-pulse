@@ -12,30 +12,43 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-// Store configurations for comparison scraping
-const COMPARISON_STORES = [
-    {
-        name: 'Amazon',
-        searchUrl: (query: string) => `https://www.amazon.com/s?k=${encodeURIComponent(query)}`,
-        icon: '📦',
-        priceSelector: '.a-price .a-offscreen, .a-price-whole, [data-a-color="price"] .a-offscreen',
-        waitSelector: '[data-component-type="s-search-result"]'
-    },
-    {
-        name: 'eBay',
-        searchUrl: (query: string) => `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`,
-        icon: '🏷️',
-        priceSelector: '.s-item__price',
-        waitSelector: '.s-item'
-    },
-    {
-        name: 'Walmart',
-        searchUrl: (query: string) => `https://www.walmart.com/search?q=${encodeURIComponent(query)}`,
-        icon: '🛒',
-        priceSelector: '[data-automation-id="product-price"] span',
-        waitSelector: '[data-item-id]'
-    }
-]
+// Locale-specific store configurations
+const STORE_CONFIGS: Record<string, Array<{
+    name: string
+    searchUrl: (query: string) => string
+    priceSelector: string
+    waitSelector: string
+}>> = {
+    'USD': [
+        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.com/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', waitSelector: '[data-component-type="s-search-result"]' },
+        { name: 'eBay', searchUrl: (q) => `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', waitSelector: '.s-item' },
+        { name: 'Walmart', searchUrl: (q) => `https://www.walmart.com/search?q=${encodeURIComponent(q)}`, priceSelector: '[data-automation-id="product-price"] span', waitSelector: '[data-item-id]' }
+    ],
+    'GBP': [
+        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.co.uk/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', waitSelector: '[data-component-type="s-search-result"]' },
+        { name: 'eBay', searchUrl: (q) => `https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', waitSelector: '.s-item' },
+        { name: 'Argos', searchUrl: (q) => `https://www.argos.co.uk/search/${encodeURIComponent(q)}`, priceSelector: '[data-test="product-card-price"]', waitSelector: '[data-test="product-card"]' }
+    ],
+    'EUR': [
+        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.de/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', waitSelector: '[data-component-type="s-search-result"]' },
+        { name: 'eBay', searchUrl: (q) => `https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', waitSelector: '.s-item' },
+        { name: 'Idealo', searchUrl: (q) => `https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(q)}`, priceSelector: '[data-testid="price"]', waitSelector: '[data-testid="product-item"]' }
+    ],
+    'CAD': [
+        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.ca/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', waitSelector: '[data-component-type="s-search-result"]' },
+        { name: 'eBay', searchUrl: (q) => `https://www.ebay.ca/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', waitSelector: '.s-item' },
+        { name: 'Best Buy CA', searchUrl: (q) => `https://www.bestbuy.ca/en-ca/search?search=${encodeURIComponent(q)}`, priceSelector: '[data-automation="product-price"]', waitSelector: '[data-automation="product-item"]' }
+    ],
+    'AUD': [
+        { name: 'Amazon', searchUrl: (q) => `https://www.amazon.com.au/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', waitSelector: '[data-component-type="s-search-result"]' },
+        { name: 'eBay', searchUrl: (q) => `https://www.ebay.com.au/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price', waitSelector: '.s-item' },
+        { name: 'Kogan', searchUrl: (q) => `https://www.kogan.com/au/search/?q=${encodeURIComponent(q)}`, priceSelector: '[data-testid="price"]', waitSelector: '[data-testid="product-card"]' }
+    ]
+}
+
+function getStoresForCurrency(currency: string) {
+    return STORE_CONFIGS[currency] || STORE_CONFIGS['USD']
+}
 
 interface ScrapedProduct {
     id: string
@@ -124,7 +137,7 @@ async function scrapeProductPrice(url: string): Promise<{ price: number; currenc
     return scrapeWithPuppeteer(url, selectors)
 }
 
-async function scrapeComparisonPrices(productName: string, productId: string): Promise<void> {
+async function scrapeComparisonPrices(productName: string, productId: string, currency: string): Promise<void> {
     // Clean query - take first 5 meaningful words
     const cleanQuery = productName
         .replace(/[^\w\s-]/g, ' ')
@@ -134,9 +147,11 @@ async function scrapeComparisonPrices(productName: string, productId: string): P
         .slice(0, 5)
         .join(' ')
 
-    console.log(`🔍 Searching comparison prices for: "${cleanQuery}"`)
+    console.log(`🔍 Searching comparison prices for: "${cleanQuery}" (${currency})`)
 
-    for (const store of COMPARISON_STORES) {
+    const stores = getStoresForCurrency(currency)
+
+    for (const store of stores) {
         try {
             const searchUrl = store.searchUrl(cleanQuery)
             console.log(`  → Checking ${store.name}...`)
@@ -299,8 +314,8 @@ async function runPriceCheck() {
                 .eq('id', product.id)
         }
 
-        // Step 2: Scrape comparison prices from other stores
-        await scrapeComparisonPrices(product.name, product.id)
+        // Step 2: Scrape comparison prices from other stores (locale-aware)
+        await scrapeComparisonPrices(product.name, product.id, product.currency || 'USD')
 
         // Rate limiting between products
         await new Promise(r => setTimeout(r, 5000))

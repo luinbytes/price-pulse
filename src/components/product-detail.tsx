@@ -41,7 +41,11 @@ const STORE_ICONS: Record<string, string> = {
     'Amazon': '📦',
     'eBay': '🏷️',
     'Walmart': '🛒',
-    'Google': '🔍'
+    'Google': '🔍',
+    'Argos': '🏪',
+    'Idealo': '💶',
+    'Best Buy CA': '🍁',
+    'Kogan': '🦘'
 }
 
 export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: ProductDetailProps) {
@@ -88,7 +92,32 @@ export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: Pr
                 .order('price', { ascending: true })
 
             if (error) throw error
-            setComparisonPrices(data || [])
+
+            // If no cached data exists, generate placeholder links for immediate access
+            if (!data || data.length === 0) {
+                const cleanQuery = product.name.replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim().split(' ').slice(0, 5).join(' ')
+                const encoded = encodeURIComponent(cleanQuery)
+
+                // Locale-aware store URLs based on product currency
+                const currency = product.currency || 'USD'
+                const storeLocales: Record<string, { amazon: string; ebay: string; local: string; localName: string }> = {
+                    'GBP': { amazon: 'amazon.co.uk', ebay: 'ebay.co.uk', local: 'argos.co.uk/search', localName: 'Argos' },
+                    'EUR': { amazon: 'amazon.de', ebay: 'ebay.de', local: 'idealo.de/preisvergleich/MainSearchProductCategory.html?q', localName: 'Idealo' },
+                    'CAD': { amazon: 'amazon.ca', ebay: 'ebay.ca', local: 'bestbuy.ca/en-ca/search?search', localName: 'Best Buy CA' },
+                    'AUD': { amazon: 'amazon.com.au', ebay: 'ebay.com.au', local: 'kogan.com/au/search/?q', localName: 'Kogan' },
+                    'USD': { amazon: 'amazon.com', ebay: 'ebay.com', local: 'walmart.com/search?q', localName: 'Walmart' }
+                }
+                const locale = storeLocales[currency] || storeLocales['USD']
+
+                const placeholders: ComparisonPrice[] = [
+                    { id: 'amazon-placeholder', store_name: 'Amazon', store_url: `https://www.${locale.amazon}/s?k=${encoded}`, price: null, currency, last_checked: new Date().toISOString(), is_available: true },
+                    { id: 'ebay-placeholder', store_name: 'eBay', store_url: `https://www.${locale.ebay}/sch/i.html?_nkw=${encoded}`, price: null, currency, last_checked: new Date().toISOString(), is_available: true },
+                    { id: 'local-placeholder', store_name: locale.localName, store_url: `https://www.${locale.local}=${encoded}`, price: null, currency, last_checked: new Date().toISOString(), is_available: true }
+                ]
+                setComparisonPrices(placeholders)
+            } else {
+                setComparisonPrices(data)
+            }
         } catch (err) {
             console.error('Failed to fetch comparison prices:', err)
         } finally {
@@ -306,7 +335,10 @@ export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: Pr
                                         {comparisonPrices.length > 0 && comparisonPrices[0]?.last_checked && (
                                             <div className="flex items-center gap-1 text-[10px] text-[#6B7280]">
                                                 <Clock className="w-3 h-3" />
-                                                Updated {formatDistanceToNow(new Date(comparisonPrices[0].last_checked), { addSuffix: true })}
+                                                {comparisonPrices[0].id.includes('placeholder')
+                                                    ? 'Prices sync in ~2h'
+                                                    : `Updated ${formatDistanceToNow(new Date(comparisonPrices[0].last_checked), { addSuffix: true })}`
+                                                }
                                             </div>
                                         )}
                                     </div>
