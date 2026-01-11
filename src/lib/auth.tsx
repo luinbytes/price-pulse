@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signInWithOAuth({
             provider: 'github',
             options: {
-                redirectTo: `${window.location.origin}/price-tracker/`
+                redirectTo: `${window.location.origin}/price-pulse/`
             }
         })
     }
@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: `${window.location.origin}/price-tracker/`
+                redirectTo: `${window.location.origin}/price-pulse/`
             }
         })
     }
