@@ -249,22 +249,23 @@ async function scrapeProductPrice(url: string, expectedCurrency: string = 'USD')
             '.pricing-price__regular-price'
         ].join(', ')
         waitSelector = '.sku-title'
-    } else if (url.includes('currys.co.uk')) {
-        // Currys-specific selectors (UK)
-        selectors = [
-            '[data-testid="price"]',
-            '.price',
-            '[class*="Price"]'
-        ].join(', ')
-        waitSelector = '[data-testid="product-title"]'
     } else if (url.includes('johnlewis.com')) {
         // John Lewis-specific selectors (UK)
         selectors = [
             '.price--now',
             '.price',
-            '[data-test="product-price"]'
+            '[data-test="product-price"]',
+            '[class*="price"]'
         ].join(', ')
         waitSelector = '[data-test="product-title"]'
+    } else if (url.includes('pricerunner.')) {
+        // PriceRunner selectors
+        selectors = [
+            'span[class*="Price"]',
+            'span[class*="price"]',
+            '[data-testid="price"]'
+        ].join(', ')
+        waitSelector = 'h1'
     } else {
         // Generic selectors for other sites
         selectors = [
