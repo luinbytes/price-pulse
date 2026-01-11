@@ -1,3 +1,6 @@
+import * as dotenv from 'dotenv'
+dotenv.config({ path: '.env' })
+dotenv.config({ path: '.env.local' })
 import { createClient } from '@supabase/supabase-js'
 import puppeteer from 'puppeteer'
 
