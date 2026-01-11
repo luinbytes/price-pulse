@@ -102,15 +102,25 @@ export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: Pr
                     if (product.url) {
                         try {
                             const url = new URL(product.url)
-                            // Extract product slug from path (e.g., /dp/B09NSLTW5R or /product-name-here)
-                            const pathParts = url.pathname.split('/').filter(p => p && p.length > 3 && !/^(dp|gp|product|item|s|search|sch)$/i.test(p))
-                            if (pathParts.length > 0) {
-                                // Clean up the product slug
-                                searchName = pathParts[pathParts.length - 1]
+                            const pathParts = url.pathname.split('/').filter(p => p && p.length > 0)
+
+                            // For Amazon URLs like /XACIOA-Vacuum-Insulated/dp/B09NSLTW5R
+                            // Get the FIRST part that looks like a product name (before /dp/)
+                            const dpIndex = pathParts.findIndex(p => p === 'dp')
+                            if (dpIndex > 0) {
+                                searchName = pathParts[dpIndex - 1]
                                     .replace(/[-_]/g, ' ')
-                                    .replace(/B0[A-Z0-9]+/g, '') // Remove Amazon ASINs
-                                    .replace(/\d{10,}/g, '') // Remove long numbers
                                     .trim()
+                            } else {
+                                // For other URLs, find the longest slug-like part
+                                const slugPart = pathParts.find(p =>
+                                    p.length > 5 &&
+                                    p.includes('-') &&
+                                    !/^(dp|gp|product|item|s|search|sch|B0[A-Z0-9]+)$/i.test(p)
+                                )
+                                if (slugPart) {
+                                    searchName = slugPart.replace(/[-_]/g, ' ').trim()
+                                }
                             }
                         } catch { /* ignore URL parse errors */ }
                     }
