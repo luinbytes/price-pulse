@@ -1,30 +1,27 @@
 /*
- * PricePulse Premium Design System
- * ================================
+ * PricePulse Design System
+ * ========================
  *
  * DESIGN PHILOSOPHY:
- * Ultra-premium glassmorphism with heavy blur, parallax depth layers,
- * and iOS 26-inspired visual effects. Every element floats with depth.
+ * Clean, refined glassmorphism with subtle depth and smooth interactions.
+ * Elegant and modern without being overwhelming.
  *
  * KEY FEATURES:
- * - Heavy backdrop blur (40-60px) with saturation boost
- * - Multi-layer parallax glass effects (.glass-layer-1/2/3)
- * - Animated gradient mesh background
- * - Grain texture overlay for premium feel
+ * - Subtle backdrop blur (20-24px) with light saturation boost
+ * - Minimal animated gradient mesh background
+ * - Light grain texture overlay
  * - Custom font pairing: Sora (headings) + Plus Jakarta Sans (body)
  * - Pink/Purple gradient accent (#FF9EB5, #B3688A, #794A63)
- * - Staggered entrance animations
- * - Responsive hover micro-interactions
+ * - Smooth entrance animations
+ * - Refined hover interactions
  *
  * GLASS CLASSES:
- * - .glass-card: Heavy glass (blur: 40px)
- * - .glass-ultra: Ultra-heavy glass (blur: 60px)
- * - .glass-parallax: Enables 3D depth layers
- * - .glass-layer-1/2/3: Individual parallax layers
+ * - .glass-card: Standard glass effect (blur: 20px)
+ * - .glass-ultra: Enhanced glass for emphasis (blur: 24px)
  *
  * USAGE:
- * Combine glass-parallax with glass-card/ultra and add .glass-layer-* children
- * for maximum depth effect. All cards should use glass-card or glass-ultra.
+ * Use .glass-card for all standard UI elements and .glass-ultra for
+ * key interactive elements like the header and tab list.
  */
 
 @import "tailwindcss";
@@ -174,14 +171,11 @@
 
 .gradient-mesh {
   background:
-    radial-gradient(circle at 20% 20%, rgba(255, 158, 181, 0.25) 0%, transparent 40%),
-    radial-gradient(circle at 80% 20%, rgba(179, 104, 138, 0.2) 0%, transparent 40%),
-    radial-gradient(circle at 20% 80%, rgba(121, 74, 99, 0.2) 0%, transparent 40%),
-    radial-gradient(circle at 80% 80%, rgba(255, 158, 181, 0.15) 0%, transparent 40%),
-    radial-gradient(circle at 50% 50%, rgba(179, 104, 138, 0.1) 0%, transparent 50%),
-    linear-gradient(135deg, #0A0A0A 0%, #121212 50%, #0A0A0A 100%);
+    radial-gradient(circle at 20% 20%, rgba(255, 158, 181, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(121, 74, 99, 0.06) 0%, transparent 50%),
+    #0A0A0A;
   background-size: 200% 200%;
-  animation: meshGradient 20s ease infinite;
+  animation: meshGradient 25s ease infinite;
 }
 
 /* Grain texture overlay */
@@ -200,78 +194,22 @@
   z-index: 1;
 }
 
-/* HEAVY Glassmorphism card effect - iOS 26 style */
+/* Refined Glassmorphism - Subtle & Clean */
 .glass-card {
-  background: rgba(26, 26, 26, 0.4);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow:
-    0 8px 32px 0 rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.1) inset,
-    0 0 60px 0 rgba(255, 158, 181, 0.05);
+  background: rgba(26, 26, 26, 0.6);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.3);
 }
 
-/* Extra heavy glass for special elements */
+/* Slightly heavier glass for emphasis */
 .glass-ultra {
-  background: rgba(26, 26, 26, 0.3);
-  backdrop-filter: blur(60px) saturate(200%);
-  -webkit-backdrop-filter: blur(60px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow:
-    0 12px 48px 0 rgba(0, 0, 0, 0.6),
-    0 0 0 1.5px rgba(255, 255, 255, 0.12) inset,
-    0 0 80px 0 rgba(255, 158, 181, 0.08);
-}
-
-/* PARALLAX GLASS LAYERS */
-.glass-parallax {
-  position: relative;
-  transform-style: preserve-3d;
-  perspective: 1000px;
-}
-
-.glass-layer-1 {
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 158, 181, 0.05);
-  backdrop-filter: blur(20px);
-  border-radius: inherit;
-  transform: translateZ(10px);
-  transition: transform 0.3s ease-out;
-}
-
-.glass-layer-2 {
-  position: absolute;
-  inset: 0;
-  background: rgba(179, 104, 138, 0.05);
-  backdrop-filter: blur(30px);
-  border-radius: inherit;
-  transform: translateZ(20px);
-  transition: transform 0.3s ease-out;
-}
-
-.glass-layer-3 {
-  position: absolute;
-  inset: 0;
-  background: rgba(121, 74, 99, 0.05);
-  backdrop-filter: blur(40px);
-  border-radius: inherit;
-  transform: translateZ(30px);
-  transition: transform 0.3s ease-out;
-}
-
-/* Hover parallax effect */
-.glass-parallax:hover .glass-layer-1 {
-  transform: translateZ(15px) translateY(-2px);
-}
-
-.glass-parallax:hover .glass-layer-2 {
-  transform: translateZ(25px) translateY(-4px);
-}
-
-.glass-parallax:hover .glass-layer-3 {
-  transform: translateZ(35px) translateY(-6px);
+  background: rgba(26, 26, 26, 0.5);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 6px 20px 0 rgba(0, 0, 0, 0.4);
 }
 
 /* Premium glow effect */

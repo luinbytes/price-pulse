@@ -23,24 +23,16 @@ function LoginPage() {
   const { signInWithGitHub, signInWithGoogle } = useAuth()
 
   return (
-    <div className="min-h-screen flex items-center justify-center gradient-mesh grain-overlay p-4">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-[#FF9EB5]/10 rounded-full blur-3xl animate-float"></div>
-        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-[#794A63]/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }}></div>
-      </div>
-
-      <Card className="w-full max-w-md glass-ultra border-[rgba(255,255,255,0.2)] animate-slide-up relative z-10 shadow-2xl">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#FF9EB5]/10 via-transparent to-[#794A63]/10 rounded-xl"></div>
-        <CardHeader className="text-center space-y-4 pb-6 relative z-10">
-          <div className="inline-flex items-center justify-center w-24 h-24 mx-auto rounded-3xl bg-gradient-to-br from-[#FF9EB5] to-[#794A63] p-1 glow-accent animate-pulse-glow">
-            <div className="w-full h-full rounded-3xl glass-card flex items-center justify-center">
-              <span className="text-5xl">💰</span>
-            </div>
+    <div className="min-h-screen flex items-center justify-center gradient-mesh p-4">
+      <Card className="w-full max-w-md glass-card border-[rgba(255,255,255,0.1)] animate-slide-up">
+        <CardHeader className="text-center space-y-3 pb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-[#FF9EB5] to-[#794A63]">
+            <span className="text-3xl">💰</span>
           </div>
-          <CardTitle className="text-5xl font-black tracking-tight">
+          <CardTitle className="text-3xl font-bold tracking-tight">
             <span className="text-gradient">PricePulse</span>
           </CardTitle>
-          <CardDescription className="text-[#9CA3AF] text-lg font-medium">
+          <CardDescription className="text-[#9CA3AF]">
             Track product prices across the web and never miss a deal
           </CardDescription>
         </CardHeader>
@@ -142,20 +134,20 @@ function Dashboard() {
   const displayName = profile.username || randomName
 
   return (
-    <div className="min-h-screen gradient-mesh grain-overlay">
+    <div className="min-h-screen gradient-mesh">
       {/* Header */}
-      <header className="border-b border-[rgba(255,255,255,0.15)] glass-ultra sticky top-0 z-50 shadow-2xl">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+      <header className="border-b border-[rgba(255,255,255,0.08)] glass-card sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <h1 className="text-2xl font-bold tracking-tight">
+            <h1 className="text-xl font-bold">
               <span className="text-gradient">PricePulse</span>
             </h1>
             <Button
               onClick={() => setInputOpen(true)}
-              className="hidden sm:flex items-center gap-2 btn-premium text-black font-semibold h-10 px-5 rounded-full shadow-lg"
+              className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-[#FF9EB5] to-[#B3688A] hover:opacity-90 text-black font-medium h-9 px-4 rounded-full transition-opacity"
             >
               <PlusCircle className="w-4 h-4" />
-              Track New Product
+              Add Product
             </Button>
           </div>
 
@@ -164,20 +156,20 @@ function Dashboard() {
               onClick={() => setInputOpen(true)}
               variant="outline"
               size="icon"
-              className="sm:hidden border-[rgba(255,158,181,0.3)] bg-transparent text-[#FF9EB5] hover:bg-[#FF9EB5]/10"
+              className="sm:hidden border-[rgba(255,158,181,0.2)] bg-transparent text-[#FF9EB5] hover:bg-[#FF9EB5]/10"
             >
               <PlusCircle className="w-5 h-5" />
             </Button>
 
-            <div className="flex items-center gap-3 pr-3 border-r border-[rgba(255,255,255,0.08)]">
+            <div className="flex items-center gap-2 pr-2 border-r border-[rgba(255,255,255,0.08)]">
               {profile.avatar_url ? (
                 <img
                   src={profile.avatar_url}
                   alt="Avatar"
-                  className="w-9 h-9 rounded-full object-cover ring-2 ring-[#FF9EB5] ring-offset-2 ring-offset-[#0A0A0A]"
+                  className="w-8 h-8 rounded-full object-cover border border-[#FF9EB5]"
                 />
               ) : (
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#794A63] to-[#FF9EB5] flex items-center justify-center text-sm font-bold text-white uppercase shadow-lg">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#794A63] to-[#FF9EB5] flex items-center justify-center text-sm font-bold text-white uppercase">
                   {displayName[0]}
                 </div>
               )}
@@ -200,76 +192,64 @@ function Dashboard() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="glass-ultra border-[rgba(255,255,255,0.2)] p-1.5 shadow-xl">
+          <TabsList className="glass-card border-[rgba(255,255,255,0.1)] p-1">
             <TabsTrigger
               value="dashboard"
-              className="text-[#9CA3AF] data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#FF9EB5] data-[state=active]:to-[#B3688A] data-[state=active]:text-black font-medium transition-all data-[state=active]:shadow-lg"
+              className="text-[#9CA3AF] data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#FF9EB5] data-[state=active]:to-[#B3688A] data-[state=active]:text-black transition-all"
             >
               Dashboard
             </TabsTrigger>
             <TabsTrigger
               value="products"
-              className="text-[#9CA3AF] data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#FF9EB5] data-[state=active]:to-[#B3688A] data-[state=active]:text-black font-medium transition-all data-[state=active]:shadow-lg"
+              className="text-[#9CA3AF] data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#FF9EB5] data-[state=active]:to-[#B3688A] data-[state=active]:text-black transition-all"
             >
               Products
             </TabsTrigger>
             <TabsTrigger
               value="settings"
-              className="text-[#9CA3AF] data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#FF9EB5] data-[state=active]:to-[#B3688A] data-[state=active]:text-black font-medium transition-all data-[state=active]:shadow-lg"
+              className="text-[#9CA3AF] data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#FF9EB5] data-[state=active]:to-[#B3688A] data-[state=active]:text-black transition-all"
             >
               Settings
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="dashboard" className="mt-8 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <Card className="glass-parallax glass-card border-[rgba(255,255,255,0.15)] overflow-visible group hover:border-[#FF9EB5]/40 transition-all hover:shadow-2xl hover:shadow-[#FF9EB5]/20 animate-slide-up stagger-1">
-                <div className="glass-layer-1 pointer-events-none"></div>
-                <div className="glass-layer-2 pointer-events-none"></div>
-                <div className="glass-layer-3 pointer-events-none"></div>
-                <div className="absolute top-0 right-0 w-40 h-40 bg-[#FF9EB5]/10 rounded-full blur-3xl transform translate-x-16 -translate-y-16 group-hover:scale-150 transition-transform duration-700"></div>
-                <CardHeader className="pb-3 relative z-10">
-                  <CardDescription className="text-[#9CA3AF] text-xs font-bold uppercase tracking-widest">Total Products</CardDescription>
-                  <CardTitle className="text-6xl font-black text-[#EDEDED] stat-value tracking-tight">{stats.total}</CardTitle>
-                  <div className="flex items-center gap-2 mt-3">
-                    <div className="w-10 h-10 rounded-xl glass-card flex items-center justify-center text-lg shadow-lg">
+          <TabsContent value="dashboard" className="mt-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="glass-card border-[rgba(255,255,255,0.1)] group hover:border-[#FF9EB5]/30 transition-all animate-slide-up stagger-1">
+                <CardHeader className="pb-3">
+                  <CardDescription className="text-[#9CA3AF] text-xs uppercase tracking-wider">Total Products</CardDescription>
+                  <CardTitle className="text-4xl font-bold text-[#EDEDED]">{stats.total}</CardTitle>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF9EB5]/20 to-[#B3688A]/20 flex items-center justify-center">
                       📦
                     </div>
-                    <span className="text-xs text-[#6B7280] font-medium">Being tracked</span>
+                    <span className="text-xs text-[#6B7280]">Being tracked</span>
                   </div>
                 </CardHeader>
               </Card>
 
-              <Card className="glass-parallax glass-card border-[rgba(255,255,255,0.15)] overflow-visible group hover:border-green-400/40 transition-all hover:shadow-2xl hover:shadow-green-400/20 animate-slide-up stagger-2">
-                <div className="glass-layer-1 pointer-events-none"></div>
-                <div className="glass-layer-2 pointer-events-none"></div>
-                <div className="glass-layer-3 pointer-events-none"></div>
-                <div className="absolute top-0 right-0 w-40 h-40 bg-green-400/10 rounded-full blur-3xl transform translate-x-16 -translate-y-16 group-hover:scale-150 transition-transform duration-700"></div>
-                <CardHeader className="pb-3 relative z-10">
-                  <CardDescription className="text-[#9CA3AF] text-xs font-bold uppercase tracking-widest">Price Drops</CardDescription>
-                  <CardTitle className="text-6xl font-black text-green-400 stat-value tracking-tight">{stats.drops}</CardTitle>
-                  <div className="flex items-center gap-2 mt-3">
-                    <div className="w-10 h-10 rounded-xl glass-card flex items-center justify-center text-lg shadow-lg">
+              <Card className="glass-card border-[rgba(255,255,255,0.1)] group hover:border-green-400/30 transition-all animate-slide-up stagger-2">
+                <CardHeader className="pb-3">
+                  <CardDescription className="text-[#9CA3AF] text-xs uppercase tracking-wider">Price Drops</CardDescription>
+                  <CardTitle className="text-4xl font-bold text-green-400">{stats.drops}</CardTitle>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-400/20 to-emerald-500/20 flex items-center justify-center">
                       📉
                     </div>
-                    <span className="text-xs text-[#6B7280] font-medium">This month</span>
+                    <span className="text-xs text-[#6B7280]">This month</span>
                   </div>
                 </CardHeader>
               </Card>
 
-              <Card className="glass-parallax glass-card border-[rgba(255,255,255,0.15)] overflow-visible group hover:border-[#FF9EB5]/40 transition-all hover:shadow-2xl hover:shadow-[#FF9EB5]/20 animate-slide-up stagger-3">
-                <div className="glass-layer-1 pointer-events-none"></div>
-                <div className="glass-layer-2 pointer-events-none"></div>
-                <div className="glass-layer-3 pointer-events-none"></div>
-                <div className="absolute top-0 right-0 w-40 h-40 bg-[#FF9EB5]/10 rounded-full blur-3xl transform translate-x-16 -translate-y-16 group-hover:scale-150 transition-transform duration-700"></div>
-                <CardHeader className="pb-3 relative z-10">
-                  <CardDescription className="text-[#9CA3AF] text-xs font-bold uppercase tracking-widest">Total Savings</CardDescription>
-                  <CardTitle className="text-6xl font-black text-gradient stat-value tracking-tight">${stats.savings.toFixed(2)}</CardTitle>
-                  <div className="flex items-center gap-2 mt-3">
-                    <div className="w-10 h-10 rounded-xl glass-card flex items-center justify-center text-lg shadow-lg">
+              <Card className="glass-card border-[rgba(255,255,255,0.1)] group hover:border-[#FF9EB5]/30 transition-all animate-slide-up stagger-3">
+                <CardHeader className="pb-3">
+                  <CardDescription className="text-[#9CA3AF] text-xs uppercase tracking-wider">Total Savings</CardDescription>
+                  <CardTitle className="text-4xl font-bold text-gradient">${stats.savings.toFixed(2)}</CardTitle>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF9EB5]/20 to-[#794A63]/20 flex items-center justify-center">
                       💰
                     </div>
-                    <span className="text-xs text-[#6B7280] font-medium">All time</span>
+                    <span className="text-xs text-[#6B7280]">All time</span>
                   </div>
                 </CardHeader>
               </Card>
@@ -319,13 +299,10 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center gradient-mesh grain-overlay">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="animate-spin rounded-full h-16 w-16 border-4 border-transparent border-t-[#FF9EB5] border-r-[#B3688A]"></div>
-            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[#FF9EB5] to-[#794A63] opacity-20 blur-xl animate-pulse"></div>
-          </div>
-          <p className="text-[#9CA3AF] text-sm font-medium">Loading PricePulse...</p>
+      <div className="min-h-screen flex items-center justify-center gradient-mesh">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-transparent border-t-[#FF9EB5] border-r-[#B3688A]"></div>
+          <p className="text-[#9CA3AF] text-sm">Loading PricePulse...</p>
         </div>
       </div>
     )
