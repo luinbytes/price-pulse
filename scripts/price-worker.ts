@@ -59,7 +59,7 @@ const STORE_CONFIGS: Record<string, Array<{
     'GBP': [
         { name: 'Amazon', searchUrl: (q) => `https://www.amazon.co.uk/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole, span.a-price', waitSelector: '[data-component-type="s-search-result"]' },
         { name: 'eBay', searchUrl: (q) => `https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price, .x-price-primary span, [data-testid="item-price"]', waitSelector: '.srp-results' },
-        { name: 'Argos', searchUrl: (q) => `https://www.argos.co.uk/search/${encodeURIComponent(q)}/`, priceSelector: '[data-test="product-card-price"], .ProductCardstyles__Price, [class*="Price"]', waitSelector: '[data-test="component-product-card"]' },
+        { name: 'Argos', searchUrl: (q) => `https://www.argos.co.uk/search/${encodeURIComponent(q)}/`, priceSelector: '[data-test="component-product-card-price"], .ProductCardstyles__Price, [data-test="product-card-price"]', waitSelector: '[data-test="component-product-card"]' },
         { name: 'Currys', searchUrl: (q) => `https://www.currys.co.uk/search?q=${encodeURIComponent(q)}`, priceSelector: '[data-testid="price"]', waitSelector: '[data-testid="product-card"]' },
         { name: 'John Lewis', searchUrl: (q) => `https://www.johnlewis.com/search?search-term=${encodeURIComponent(q)}`, priceSelector: '.price', waitSelector: '[data-test="product-card"]' }
     ],
@@ -97,7 +97,7 @@ interface ScrapedProduct {
     image_url?: string
 }
 
-async function scrapeWithPuppeteer(url: string, priceSelector: string, waitSelector?: string, expectedCurrency: string = 'USD'): Promise<{ price: number; currency: string } | null> {
+async function scrapeWithPuppeteer(url: string, priceSelector: string, waitSelector?: string, expectedCurrency: string = 'USD'): Promise<{ price: number; currency: string; title?: string } | null> {
     let browser
     try {
         browser = await puppeteer.launch({
@@ -123,14 +123,38 @@ async function scrapeWithPuppeteer(url: string, priceSelector: string, waitSelec
         // Extra wait for dynamic content
         await new Promise(r => setTimeout(r, 2000))
 
-        // Extract price - just get the number, use expected currency
-        const priceData = await page.evaluate((selector) => {
+        // Extract price and title
+        const scrapeData = await page.evaluate((selector, priorityTitleSelector) => {
+            // Get page title - try common product title selectors first
+            const titleSelectors = [
+                priorityTitleSelector,      // Use the store-specific wait selector first!
+                '#productTitle',           // Amazon
+                '[data-test="product-title"]', // Argos, Target
+                '[data-testid="product-title"]', // Walmart
+                '[data-testid="x-item-title"]', // eBay
+                '.product-name h1',
+                '.product-title',
+                'h1'                        // Fallback to first h1
+            ].filter(s => s) as string[]
+
+            let title = ''
+            for (const sel of titleSelectors) {
+                const el = document.querySelector(sel)
+                if (el?.textContent?.trim()) {
+                    title = el.textContent.trim()
+                    // Limit length and clean up
+                    title = title.substring(0, 100).replace(/\s+/g, ' ').trim()
+                    break
+                }
+            }
+
+            // Get price
             const elements = document.querySelectorAll(selector)
             for (const el of elements) {
                 const text = el.textContent?.trim() || ''
                 if (text) {
                     // Match price patterns - handle different formats
-                    const match = text.match(/[\$£€]?\s*(\d{1,3}(?:[,.\s]\d{3})*(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?)/)
+                    const match = text.match(/[$£€]?\s*(\d{1,3}(?:[,.\s]\d{3})*(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?)/)
                     if (match) {
                         // Normalize price - handle both 1,234.56 and 1.234,56 formats
                         let priceStr = match[1].replace(/\s/g, '')
@@ -143,16 +167,16 @@ async function scrapeWithPuppeteer(url: string, priceSelector: string, waitSelec
                         }
                         const price = parseFloat(priceStr)
                         if (price > 0 && price < 100000) {
-                            return { price }
+                            return { price, title }
                         }
                     }
                 }
             }
-            return null
-        }, priceSelector)
+            return title ? { price: 0, title } : null
+        }, priceSelector, waitSelector)
 
-        if (priceData) {
-            return { price: priceData.price, currency: expectedCurrency }
+        if (scrapeData && scrapeData.price > 0) {
+            return { price: scrapeData.price, currency: expectedCurrency, title: scrapeData.title || undefined }
         }
         return null
     } catch (err) {
@@ -169,7 +193,7 @@ async function scrapeProductPrice(url: string, expectedCurrency: string = 'USD')
     let waitSelector: string | undefined
 
     if (url.includes('amazon.')) {
-        // Amazon-specific selectors (more reliable)
+        // Amazon-specific selectors
         selectors = [
             '.a-price .a-offscreen',
             '#corePrice_feature_div .a-offscreen',
@@ -181,16 +205,77 @@ async function scrapeProductPrice(url: string, expectedCurrency: string = 'USD')
             'span.a-price span.a-offscreen'
         ].join(', ')
         waitSelector = '#productTitle, #title'
+    } else if (url.includes('argos.co.uk')) {
+        // Argos-specific selectors (UK)
+        selectors = [
+            '[data-test="product-price-primary"]',
+            '[data-test="product-price"]',
+            '.ProductPrice',
+            '[class*="price" i]'
+        ].join(', ')
+        waitSelector = '[data-test="product-title"]'
+    } else if (url.includes('ebay.')) {
+        // eBay-specific selectors (works for all locales)
+        selectors = [
+            '[data-testid="x-price-primary"]',
+            '.x-price-primary',
+            '.x-price-approx',
+            '.mainPrice',
+            '.ux-textspans.ux-textspans--BOLD'
+        ].join(', ')
+        waitSelector = '[data-testid="x-item-title"]'
+    } else if (url.includes('walmart.')) {
+        // Walmart-specific selectors
+        selectors = [
+            '[data-automation-id="product-price"]',
+            '[data-testid="price-main"]',
+            '.f1.bold',
+            '#price'
+        ].join(', ')
+        waitSelector = '[data-testid="product-title"]'
+    } else if (url.includes('target.com')) {
+        // Target-specific selectors
+        selectors = [
+            '[data-test="product-price"]',
+            '[data-test="current-price"]',
+            '.styles__CurrentPriceFull'
+        ].join(', ')
+        waitSelector = '[data-test="product-title"]'
+    } else if (url.includes('bestbuy.')) {
+        // Best Buy-specific selectors
+        selectors = [
+            '.priceView-customer-price span',
+            '[data-testid="customer-price"]',
+            '.pricing-price__regular-price'
+        ].join(', ')
+        waitSelector = '.sku-title'
+    } else if (url.includes('currys.co.uk')) {
+        // Currys-specific selectors (UK)
+        selectors = [
+            '[data-testid="price"]',
+            '.price',
+            '[class*="Price"]'
+        ].join(', ')
+        waitSelector = '[data-testid="product-title"]'
+    } else if (url.includes('johnlewis.com')) {
+        // John Lewis-specific selectors (UK)
+        selectors = [
+            '.price--now',
+            '.price',
+            '[data-test="product-price"]'
+        ].join(', ')
+        waitSelector = '[data-test="product-title"]'
     } else {
         // Generic selectors for other sites
         selectors = [
             'meta[property="product:price:amount"]',
             'meta[property="og:price:amount"]',
+            '[data-testid="price"]',
+            '[data-test="price"]',
             '.price',
             '.product-price',
-            '[data-testid="price"]',
-            '.price-item--sale',
-            '.price-item--regular'
+            '.Price',
+            '#price'
         ].join(', ')
     }
 
@@ -357,17 +442,30 @@ async function runPriceCheck() {
             const oldPrice = product.current_price
             const newPrice = result.price
 
+            // Use scraped title if available, otherwise fallback to URL-extracted name, otherwise keep existing
+            // But only if existing name is a placeholder/queued/pending or scraped title is better
+            let finalName = product.name
+
+            if (result.title && result.title.length > 5) {
+                finalName = result.title
+            } else if (productName && productName !== product.name) {
+                finalName = productName
+            }
+
             // Update product with proper name, currency, and price
             await supabase
                 .from('products')
                 .update({
-                    name: productName !== product.name ? productName : product.name,
+                    name: finalName,
                     currency: productCurrency,
                     current_price: newPrice,
                     last_checked: new Date().toISOString(),
                     status: 'tracking'
                 })
                 .eq('id', product.id)
+
+            // Update local variable for comparison scraping
+            productName = finalName
 
             console.log(`   ✅ Price: ${productCurrency} ${newPrice}`)
 

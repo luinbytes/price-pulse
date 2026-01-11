@@ -164,14 +164,52 @@ export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: Pr
 
     useEffect(() => {
         if (product && open) {
-            fetchPriceHistory()
-            fetchComparisonPrices()
-            setEditedName(product.name)
-            setEditedPrice(product.current_price?.toString() || '0')
-            setEditedCurrency(product.currency || 'USD')
-            setIsEditing(false)
+            if (isEditing) {
+                setEditedName(product.name)
+                setEditedPrice(product.current_price?.toString() || '')
+                setEditedCurrency(product.currency || 'USD')
+            } else {
+                fetchPriceHistory()
+                fetchComparisonPrices()
+            }
+
+            // Subscribe to real-time updates for this product and its comparisons
+            const channel = supabase
+                .channel(`product-${product.id}`)
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'products',
+                    filter: `id=eq.${product.id}`
+                }, (payload) => {
+                    console.log('Product updated:', payload)
+                    if (onUpdate) onUpdate(payload.new as Product)
+                })
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'comparison_prices',
+                    filter: `product_id=eq.${product.id}`
+                }, () => {
+                    console.log('New comparison price found!')
+                    fetchComparisonPrices()
+                })
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'comparison_prices',
+                    filter: `product_id=eq.${product.id}`
+                }, () => {
+                    console.log('Comparison price updated!')
+                    fetchComparisonPrices()
+                })
+                .subscribe()
+
+            return () => {
+                supabase.removeChannel(channel)
+            }
         }
-    }, [product, open, fetchPriceHistory, fetchComparisonPrices])
+    }, [product, isEditing, fetchPriceHistory, fetchComparisonPrices, onUpdate])
 
     const handleUpdate = async () => {
         if (!product) return
@@ -362,62 +400,69 @@ export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: Pr
 
                                 <Separator className="bg-[#2A2A2A]" />
 
-                                {/* Compare Stores - Now fetches from DB */}
+                                {/* Compare Stores - Only show if we have real data */}
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <h3 className="text-xs font-bold text-[#EDEDED] uppercase tracking-widest opacity-50">Compare Stores</h3>
                                             {comparisonLoading && <Loader2 className="w-3 h-3 animate-spin text-[#FF9EB5]" />}
                                         </div>
-                                        {comparisonPrices.length > 0 && comparisonPrices[0]?.last_checked && (
+                                        {/* Only show timestamp for real data */}
+                                        {comparisonPrices.length > 0 && comparisonPrices[0]?.last_checked && !comparisonPrices[0].id.includes('placeholder') && (
                                             <div className="flex items-center gap-1 text-[10px] text-[#6B7280]">
                                                 <Clock className="w-3 h-3" />
-                                                {comparisonPrices[0].id.includes('placeholder')
-                                                    ? 'Prices sync in ~2h'
-                                                    : `Updated ${formatDistanceToNow(new Date(comparisonPrices[0].last_checked), { addSuffix: true })}`
-                                                }
+                                                Updated {formatDistanceToNow(new Date(comparisonPrices[0].last_checked), { addSuffix: true })}
                                             </div>
                                         )}
                                     </div>
-                                    <p className="text-[10px] text-[#6B7280] -mt-1">Prices are for similar products. Click to verify exact match.</p>
 
-                                    {comparisonPrices.length > 0 ? (
-                                        <div className="grid grid-cols-1 gap-2">
-                                            {comparisonPrices.map(cp => {
-                                                const isBest = bestPrice && cp.id === bestPrice.id && cp.price
-                                                return (
-                                                    <a
-                                                        key={cp.id}
-                                                        href={cp.store_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all hover:-translate-y-0.5 ${isBest
-                                                            ? 'bg-green-500/10 border-green-500/30 hover:border-green-400'
-                                                            : 'bg-[#0A0A0A] border-[#2A2A2A] hover:border-[#FF9EB5]'
-                                                            }`}
-                                                    >
-                                                        <span className="text-xl shrink-0">{STORE_ICONS[cp.store_name] || '🏪'}</span>
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="text-[10px] text-[#9CA3AF] font-bold uppercase">{cp.store_name}</p>
-                                                            {cp.price ? (
-                                                                <p className={`text-lg font-black leading-tight ${isBest ? 'text-green-400' : 'text-[#FF9EB5]'}`}>
-                                                                    {formatCurrency(cp.price, cp.currency)}
-                                                                </p>
-                                                            ) : (
-                                                                <p className="text-sm text-[#6B7280]">View Store →</p>
-                                                            )}
-                                                        </div>
-                                                        {isBest && (
-                                                            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-[10px] font-bold">
-                                                                <TrendingDown className="w-3 h-3" />
-                                                                BEST
-                                                            </div>
-                                                        )}
-                                                        <ExternalLink className="w-4 h-4 text-[#6B7280] shrink-0" />
-                                                    </a>
-                                                )
-                                            })}
+                                    {/* Check if product is still queued or has no real comparison data */}
+                                    {(product.status === 'queued' || product.status === 'scraping' || product.current_price === 0) ? (
+                                        <div className="p-4 rounded-xl bg-[#0A0A0A] border border-[#2A2A2A] text-center">
+                                            <Loader2 className="w-5 h-5 animate-spin text-[#FF9EB5] mx-auto mb-2" />
+                                            <p className="text-sm text-[#9CA3AF]">Awaiting first price check...</p>
+                                            <p className="text-[10px] text-[#6B7280] mt-1">The worker runs every 2 hours on GitHub Actions</p>
                                         </div>
+                                    ) : comparisonPrices.length > 0 && !comparisonPrices[0].id.includes('placeholder') ? (
+                                        <>
+                                            <p className="text-[10px] text-[#6B7280] -mt-1">Prices are for similar products. Click to verify exact match.</p>
+                                            <div className="grid grid-cols-1 gap-2">
+                                                {comparisonPrices.map(cp => {
+                                                    const isBest = bestPrice && cp.id === bestPrice.id && cp.price
+                                                    return (
+                                                        <a
+                                                            key={cp.id}
+                                                            href={cp.store_url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className={`flex items-center gap-3 p-3 rounded-xl border transition-all hover:-translate-y-0.5 ${isBest
+                                                                ? 'bg-green-500/10 border-green-500/30 hover:border-green-400'
+                                                                : 'bg-[#0A0A0A] border-[#2A2A2A] hover:border-[#FF9EB5]'
+                                                                }`}
+                                                        >
+                                                            <span className="text-xl shrink-0">{STORE_ICONS[cp.store_name] || '🏪'}</span>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-[10px] text-[#9CA3AF] font-bold uppercase">{cp.store_name}</p>
+                                                                {cp.price ? (
+                                                                    <p className={`text-lg font-black leading-tight ${isBest ? 'text-green-400' : 'text-[#FF9EB5]'}`}>
+                                                                        {formatCurrency(cp.price, cp.currency)}
+                                                                    </p>
+                                                                ) : (
+                                                                    <p className="text-sm text-[#6B7280]">View Store →</p>
+                                                                )}
+                                                            </div>
+                                                            {isBest && (
+                                                                <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-[10px] font-bold">
+                                                                    <TrendingDown className="w-3 h-3" />
+                                                                    BEST
+                                                                </div>
+                                                            )}
+                                                            <ExternalLink className="w-4 h-4 text-[#6B7280] shrink-0" />
+                                                        </a>
+                                                    )
+                                                })}
+                                            </div>
+                                        </>
                                     ) : (
                                         <div className="text-center py-6 text-[#6B7280] text-xs">
                                             {comparisonLoading ? (

@@ -64,18 +64,37 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
 
             if (error) throw error
             setProducts(data || [])
-        } catch {
+        } catch (err) {
             toast.error('Failed to load products')
+            console.error(err)
         } finally {
             setLoading(false)
         }
     }, [user])
 
     useEffect(() => {
+        fetchProducts()
+
+        // Subscribe to real-time updates for products list
         if (user) {
-            fetchProducts()
+            const channel = supabase
+                .channel('products-list')
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'products',
+                    filter: `user_id=eq.${user.id}`
+                }, (payload) => {
+                    console.log('Products list updated:', payload)
+                    fetchProducts()
+                })
+                .subscribe()
+
+            return () => {
+                supabase.removeChannel(channel)
+            }
         }
-    }, [user, refreshTrigger, fetchProducts])
+    }, [refreshTrigger, fetchProducts, user])
 
     const deleteProduct = async (id: string) => {
         try {

@@ -38,26 +38,68 @@ export function ProductInputModal({ open, onOpenChange, onProductAdded }: Produc
         setLoading(true)
 
         try {
-            // Get domain for a temporary name
-            let domain = 'Product'
+            // Extract meaningful product name and currency from URL
+            let productName = 'New Product'
+            let currency = 'USD'
+
             try {
-                domain = new URL(url).hostname.replace('www.', '').split('.')[0]
-                domain = domain.charAt(0).toUpperCase() + domain.slice(1)
+                const urlObj = new URL(url)
+                const hostname = urlObj.hostname.toLowerCase()
+
+                // Determine currency from domain
+                if (hostname.includes('.co.uk')) currency = 'GBP'
+                else if (hostname.includes('.de') || hostname.includes('.fr') || hostname.includes('.it') || hostname.includes('.es')) currency = 'EUR'
+                else if (hostname.includes('.ca')) currency = 'CAD'
+                else if (hostname.includes('.com.au')) currency = 'AUD'
+
+                // Extract product name from URL path
+                const pathParts = urlObj.pathname.split('/').filter(p => p && p.length > 0)
+
+                // For Amazon URLs: /Product-Name-Here/dp/B09NSLTW5R
+                const dpIndex = pathParts.findIndex(p => p === 'dp')
+                if (dpIndex > 0) {
+                    productName = pathParts[dpIndex - 1].replace(/[-_]/g, ' ').trim()
+                } else {
+                    // For other URLs, find the longest slug-like part
+                    const slugPart = pathParts.find(p =>
+                        p.length > 5 &&
+                        p.includes('-') &&
+                        !/^(product|item|s|search|sch|p|buy|shop)$/i.test(p)
+                    )
+                    if (slugPart) {
+                        productName = slugPart.replace(/[-_]/g, ' ').trim()
+                    } else {
+                        // Try to find a product ID from the URL
+                        const idPart = pathParts.find(p => /^\d+$/.test(p))
+                        if (idPart) {
+                            // Get store name for context
+                            const storeName = hostname.replace('www.', '').split('.')[0]
+                            productName = `${storeName.charAt(0).toUpperCase() + storeName.slice(1)} #${idPart}`
+                        } else {
+                            // Use generic pending name - worker will update with actual title
+                            productName = 'Pending...'
+                        }
+                    }
+                }
+
+                // Capitalize first letter of each word
+                productName = productName.replace(/\b\w/g, c => c.toUpperCase())
+
             } catch { /* ignore */ }
 
-            // Insert immediately with 'scraping' status
+            // Insert with extracted name and currency, 'queued' status
             const { error } = await supabase.from('products').insert({
                 user_id: user.id,
-                name: `Scraping: ${domain}...`,
+                name: productName,
                 url: url,
                 current_price: 0,
-                currency: 'USD',
-                status: 'scraping'
+                currency: currency,
+                status: 'queued'
             })
 
             if (error) throw error
 
-            toast.info('Tracking started in background...')
+            toast.success(`Added "${productName}" - price check queued`)
             onProductAdded?.()
             onOpenChange(false)
 
