@@ -108,7 +108,9 @@ function Dashboard() {
       fetchStats()
       fetchProfile()
     }
-  }, [user, refreshTrigger, fetchStats, fetchProfile])
+    // fetchStats and fetchProfile only depend on 'user', so we don't need them in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, refreshTrigger])
 
   const handleProductAdded = () => {
     setRefreshTrigger(prev => prev + 1)

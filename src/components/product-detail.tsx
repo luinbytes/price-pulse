@@ -429,6 +429,7 @@ export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: Pr
                                             <div className="grid grid-cols-1 gap-2">
                                                 {comparisonPrices.map(cp => {
                                                     const isBest = bestPrice && cp.id === bestPrice.id && cp.price
+                                                    const isApproximate = cp.is_approximate_match === true
                                                     return (
                                                         <a
                                                             key={cp.id}
@@ -442,7 +443,17 @@ export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: Pr
                                                         >
                                                             <span className="text-xl shrink-0">{STORE_ICONS[cp.store_name] || '🏪'}</span>
                                                             <div className="flex-1 min-w-0">
-                                                                <p className="text-[10px] text-[#9CA3AF] font-bold uppercase">{cp.store_name}</p>
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="text-[10px] text-[#9CA3AF] font-bold uppercase">{cp.store_name}</p>
+                                                                    {isApproximate && (
+                                                                        <span
+                                                                            className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold"
+                                                                            title={`Similar product match (${cp.match_score ? (cp.match_score * 100).toFixed(0) : '?'}% match)`}
+                                                                        >
+                                                                            ~
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                                 {cp.price ? (
                                                                     <p className={`text-lg font-black leading-tight ${isBest ? 'text-green-400' : 'text-[#FF9EB5]'}`}>
                                                                         {formatCurrency(cp.price, cp.currency)}

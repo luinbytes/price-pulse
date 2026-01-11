@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,7 +20,18 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
 
 
     // Server-side scraping - just mark as queued, the GitHub Action will handle it
+    // Track which products have been processed to avoid duplicate updates
+    const processedRef = useRef<Set<string>>(new Set())
+
     const handleBackgroundScrape = useCallback(async (product: Product) => {
+        // Skip if already processed
+        if (processedRef.current.has(product.id)) {
+            return
+        }
+
+        // Mark as processed
+        processedRef.current.add(product.id)
+
         try {
             // Mark as queued for server-side scraping
             const { error } = await supabase
@@ -34,7 +45,8 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
                 prev.map(p => p.id === product.id ? { ...p, status: 'queued' } : p)
             )
         } catch {
-            // Mark as pending if update fails
+            // Mark as pending if update fails and remove from processed set
+            processedRef.current.delete(product.id)
             setProducts(prev =>
                 prev.map(p => p.id === product.id ? { ...p, status: 'pending' } : p)
             )
@@ -49,7 +61,9 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
                 handleBackgroundScrape(product)
             })
         }
-    }, [products, handleBackgroundScrape])
+        // handleBackgroundScrape is stable (empty deps), only run when products change
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [products])
 
     const fetchProducts = useCallback(async () => {
         if (!user) return
@@ -94,18 +108,21 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
                 supabase.removeChannel(channel)
             }
         }
-    }, [refreshTrigger, fetchProducts, user])
+        // fetchProducts only depends on 'user', so we don't need it in deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [refreshTrigger, user])
 
     const deleteProduct = async (id: string) => {
         try {
-            const { error } = await supabase
+            const { error} = await supabase
                 .from('products')
                 .delete()
                 .eq('id', id)
 
             if (error) throw error
 
-            setProducts(products.filter(p => p.id !== id))
+            // Use callback form to avoid stale closure
+            setProducts(prev => prev.filter(p => p.id !== id))
             toast.success('Product deleted')
         } catch (err) {
             toast.error('Failed to delete product')

@@ -581,9 +581,13 @@ async function scrapeComparisonPrices(productName: string, productId: string, cu
             )
 
             if (result && result.price > 0) {
-                console.log(`    ✅ Match found: ${result.currency} ${result.price}`)
+                // Determine if this is an approximate match (good score but not perfect)
+                const isApproximateMatch = result.score < 0.8
+                const matchQuality = isApproximateMatch ? '⚠️ Similar product' : '✅ Exact match'
 
-                // Upsert comparison price
+                console.log(`    ${matchQuality}: ${result.currency} ${result.price} (score: ${result.score.toFixed(2)})`)
+
+                // Upsert comparison price with match metadata
                 await supabase
                     .from('comparison_prices')
                     .upsert({
@@ -593,7 +597,9 @@ async function scrapeComparisonPrices(productName: string, productId: string, cu
                         price: result.price,
                         currency: result.currency,
                         last_checked: new Date().toISOString(),
-                        is_available: true
+                        is_available: true,
+                        is_approximate_match: isApproximateMatch,
+                        match_score: result.score
                     }, { onConflict: 'product_id,store_name' })
             } else {
                 console.log(`    ⚠️ No matching product found`)
@@ -679,7 +685,10 @@ async function runPriceCheck() {
                 const url = new URL(product.url)
 
                 // Determine currency from domain
-                if (url.hostname.includes('.co.uk')) productCurrency = 'GBP'
+                // Special cases first (UK sites with .com domains)
+                if (url.hostname.includes('johnlewis.com') || url.hostname.includes('argos.co.uk')) productCurrency = 'GBP'
+                // Standard domain-based detection
+                else if (url.hostname.includes('.co.uk')) productCurrency = 'GBP'
                 else if (url.hostname.includes('.de') || url.hostname.includes('.fr') || url.hostname.includes('.it') || url.hostname.includes('.es')) productCurrency = 'EUR'
                 else if (url.hostname.includes('.ca')) productCurrency = 'CAD'
                 else if (url.hostname.includes('.com.au')) productCurrency = 'AUD'
