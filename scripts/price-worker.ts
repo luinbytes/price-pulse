@@ -129,25 +129,38 @@ async function scrapeWithPuppeteer(url: string, priceSelector: string, waitSelec
     }
 }
 
-async function scrapeProductPrice(url: string): Promise<{ price: number; currency: string } | null> {
-    // Use common selectors for product pages
-    const selectors = [
-        // Meta tags (most reliable)
-        'meta[property="product:price:amount"]',
-        'meta[property="og:price:amount"]',
-        // Common price selectors
-        '.a-price .a-offscreen',
-        '.a-price-whole',
-        '#priceblock_ourprice',
-        '#priceblock_dealprice',
-        '.price-item--sale',
-        '.price-item--regular',
-        '[data-testid="price"]',
-        '.product-price',
-        '.price'
-    ].join(', ')
+async function scrapeProductPrice(url: string, expectedCurrency: string = 'USD'): Promise<{ price: number; currency: string } | null> {
+    // Determine which selectors to use based on the URL
+    let selectors: string
+    let waitSelector: string | undefined
 
-    return scrapeWithPuppeteer(url, selectors)
+    if (url.includes('amazon.')) {
+        // Amazon-specific selectors (more reliable)
+        selectors = [
+            '.a-price .a-offscreen',
+            '#corePrice_feature_div .a-offscreen',
+            '#corePriceDisplay_desktop_feature_div .a-offscreen',
+            '.a-price-whole',
+            '#priceblock_ourprice',
+            '#priceblock_dealprice',
+            '#price_inside_buybox',
+            'span.a-price span.a-offscreen'
+        ].join(', ')
+        waitSelector = '#productTitle, #title'
+    } else {
+        // Generic selectors for other sites
+        selectors = [
+            'meta[property="product:price:amount"]',
+            'meta[property="og:price:amount"]',
+            '.price',
+            '.product-price',
+            '[data-testid="price"]',
+            '.price-item--sale',
+            '.price-item--regular'
+        ].join(', ')
+    }
+
+    return scrapeWithPuppeteer(url, selectors, waitSelector, expectedCurrency)
 }
 
 async function scrapeComparisonPrices(productName: string, productId: string, currency: string): Promise<void> {
@@ -262,74 +275,93 @@ async function runPriceCheck() {
     console.log(`📦 Found ${products?.length || 0} products to check\n`)
 
     for (const product of products || []) {
-        console.log(`\n📍 Processing: ${product.name.substring(0, 50)}...`)
+        // Extract real product name and currency from URL if stored values are placeholders
+        let productName = product.name
+        let productCurrency = product.currency || 'USD'
 
-        // Step 1: Scrape main product price
-        const result = await scrapeProductPrice(product.url!)
+        if (product.url) {
+            try {
+                const url = new URL(product.url)
+
+                // Determine currency from domain
+                if (url.hostname.includes('.co.uk')) productCurrency = 'GBP'
+                else if (url.hostname.includes('.de') || url.hostname.includes('.fr') || url.hostname.includes('.it') || url.hostname.includes('.es')) productCurrency = 'EUR'
+                else if (url.hostname.includes('.ca')) productCurrency = 'CAD'
+                else if (url.hostname.includes('.com.au')) productCurrency = 'AUD'
+
+                // Extract product name from URL if stored name is a placeholder
+                if (productName.toLowerCase().startsWith('scraping') || productName.length < 5) {
+                    const pathParts = url.pathname.split('/').filter(p => p && p.length > 0)
+                    const dpIndex = pathParts.findIndex(p => p === 'dp')
+                    if (dpIndex > 0) {
+                        productName = pathParts[dpIndex - 1].replace(/[-_]/g, ' ').trim()
+                    } else {
+                        const slugPart = pathParts.find(p => p.length > 5 && p.includes('-'))
+                        if (slugPart) productName = slugPart.replace(/[-_]/g, ' ').trim()
+                    }
+                }
+            } catch { /* ignore */ }
+        }
+
+        console.log(`\n📍 Processing: ${productName.substring(0, 50)}...`)
+        console.log(`   URL: ${product.url}`)
+        console.log(`   Currency: ${productCurrency}`)
+
+        // Step 1: Scrape main product price with the correct expected currency
+        const result = await scrapeProductPrice(product.url!, productCurrency)
 
         if (result) {
             const oldPrice = product.current_price
             const newPrice = result.price
 
-            // Update last_checked
+            // Update product with proper name, currency, and price
             await supabase
                 .from('products')
-                .update({ last_checked: new Date().toISOString(), status: 'tracking' })
+                .update({
+                    name: productName !== product.name ? productName : product.name,
+                    currency: productCurrency,
+                    current_price: newPrice,
+                    last_checked: new Date().toISOString(),
+                    status: 'tracking'
+                })
                 .eq('id', product.id)
+
+            console.log(`   ✅ Price: ${productCurrency} ${newPrice}`)
 
             if (oldPrice && newPrice < oldPrice) {
                 console.log(`   🤑 PRICE DROP: ${oldPrice} → ${newPrice}`)
 
                 await supabase
-                    .from('products')
-                    .update({ current_price: newPrice })
-                    .eq('id', product.id)
-
-                await supabase
                     .from('price_history')
                     .insert({
                         product_id: product.id,
                         price: newPrice,
-                        currency: result.currency,
+                        currency: productCurrency,
                         source: 'price_worker_automation'
                     })
-
-                // Send Discord notification
-                const { data: settings } = await supabase
-                    .from('user_settings')
-                    .select('discord_webhook')
-                    .eq('id', product.user_id)
-                    .single()
-
-                if (settings?.discord_webhook) {
-                    console.log(`   🔔 Sending Discord alert...`)
-                    await sendDiscordNotification(settings.discord_webhook, product, oldPrice, newPrice)
-                }
-            } else if (!oldPrice || newPrice !== oldPrice) {
-                await supabase
-                    .from('products')
-                    .update({ current_price: newPrice })
-                    .eq('id', product.id)
+            } else if (oldPrice && newPrice > oldPrice) {
+                console.log(`   📈 Price increased: ${oldPrice} → ${newPrice}`)
 
                 await supabase
                     .from('price_history')
                     .insert({
                         product_id: product.id,
                         price: newPrice,
-                        currency: result.currency,
+                        currency: productCurrency,
                         source: 'price_worker_automation'
                     })
             }
+
+            // Step 2: Only scrape comparison prices if main product succeeded
+            await scrapeComparisonPrices(productName, product.id, productCurrency)
         } else {
-            console.warn(`   ⚠️ Could not scrape main product price`)
+            console.warn(`   ⚠️ Could not scrape main product price - skipping comparisons`)
             await supabase
                 .from('products')
                 .update({ status: 'scrape_failed' })
                 .eq('id', product.id)
+            // Skip comparison scraping when main product fails
         }
-
-        // Step 2: Scrape comparison prices from other stores (locale-aware)
-        await scrapeComparisonPrices(product.name, product.id, product.currency || 'USD')
 
         // Rate limiting between products
         await new Promise(r => setTimeout(r, 5000))
