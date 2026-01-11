@@ -1,73 +1,75 @@
-# React + TypeScript + Vite
+# PricePulse
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+PricePulse is a modern, real-time price tracking and comparison dashboard built with React and TypeScript. It helps you track product prices across various e-commerce websites, visualize price trends, and automatically find the best deals.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **📊 Price Trend Analysis**: Visual charts to track price history over time.
+- **🛍️ Product Management**: Easily add, edit, and delete products to track.
+- **📉 Automated Price Drops**: Detects price changes and calculates savings.
+- **🔍 Price Comparison**: Automatically scrapes and compares prices across multiple stores (Amazon, eBay, Walmart, etc.).
+- **🌓 Modern UI**: Beautiful glassmorphism design with Dark/Light mode support.
+- **🔐 Secure Authentication**: User accounts powered by Supabase Auth.
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Frontend**: React 19, TypeScript, Vite
+- **Styling**: Tailwind CSS, Tailwind Animate, Lucide React
+- **Backend/Database**: Supabase (PostgreSQL, Auth)
+- **Scraping**: Puppeteer (headless browser for price checking)
+- **Charts**: Recharts
+- **State Management**: React Hooks
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Prerequisites
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- Node.js (v18 or higher)
+- A Supabase project
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Installation
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/luinbytes/price-tracker.git
+   cd price-tracker
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Set up environment variables:
+   Create a `.env` file in the root directory with the following credentials:
+   ```env
+   VITE_SUPABASE_URL=your_supabase_project_url
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   SUPABASE_URL=your_supabase_project_url
+   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+   ```
+   *Note: `SUPABASE_SERVICE_ROLE_KEY` is required for the server-side scraping script.*
+
+4. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+### Running the Price Scraper
+
+To manually trigger the price check and comparison script:
+
+```bash
+npm run price-check
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Scripts
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- `npm run dev`: Start the development server.
+- `npm run build`: Build the project for production.
+- `npm run price-check`: Run the headless scraper to update prices.
+- `npm run lint`: Run ESLint.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## License
+
+MIT
