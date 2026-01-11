@@ -105,7 +105,35 @@ export function ProductInputModal({ open, onOpenChange, onProductAdded }: Produc
 
             if (error) throw error
 
-            toast.success(`Added "${productName}" - price check queued`)
+            // Trigger GitHub Workflow checks (with cooldown to prevent spam)
+            const COOLDOWN_MS = 5 * 60 * 1000 // 5 minutes
+            const lastTrigger = localStorage.getItem('last_workflow_trigger')
+            const now = Date.now()
+
+            if (!lastTrigger || (now - parseInt(lastTrigger)) > COOLDOWN_MS) {
+                // Trigger the workflow
+                const githubToken = import.meta.env.VITE_GITHUB_TOKEN
+                if (githubToken) {
+                    await fetch('https://api.github.com/repos/luinbytes/price-pulse/dispatches', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Authorization': `token ${githubToken}`,
+                        },
+                        body: JSON.stringify({
+                            event_type: 'price-check-trigger'
+                        })
+                    })
+
+                    localStorage.setItem('last_workflow_trigger', now.toString())
+                    toast.success(`Added "${productName}" - price check started!`)
+                } else {
+                    toast.success(`Added "${productName}" - price check queued (scheduled)`)
+                }
+            } else {
+                toast.info(`Added "${productName}" to queue (cooldown active). Will be checked in the next run.`)
+            }
+
             onProductAdded?.()
             onOpenChange(false)
 

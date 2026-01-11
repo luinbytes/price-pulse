@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: '0 */2 * * *' # Every 2 hours
   workflow_dispatch: # Manual trigger
+  repository_dispatch:
+    types: [price-check-trigger]
 
 jobs:
   check-prices:
