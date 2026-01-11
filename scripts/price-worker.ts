@@ -61,7 +61,7 @@ const STORE_CONFIGS: Record<string, Array<{
         { name: 'eBay', searchUrl: (q) => `https://www.ebay.co.uk/sch/i.html?_nkw=${encodeURIComponent(q)}`, priceSelector: '.s-item__price, .s-card__price, .x-price-primary span', waitSelector: '.s-item, .s-card' },
         { name: 'Argos', searchUrl: (q) => `https://www.argos.co.uk/search/${encodeURIComponent(q)}/`, priceSelector: '[data-test="component-product-card-price"], .ProductCardstyles__Price', waitSelector: '[data-test="component-product-card"]' },
         { name: 'John Lewis', searchUrl: (q) => `https://www.johnlewis.com/search?search-term=${encodeURIComponent(q)}`, priceSelector: '.price, [class*="price"]', waitSelector: '[data-testid="product-card"]' },
-        { name: 'PriceRunner', searchUrl: (q) => `https://www.pricerunner.com/results?q=${encodeURIComponent(q)}`, priceSelector: 'span[class*="Price"], span[class*="price"]', waitSelector: 'div[class*="card"], a[href*="/pl/"]' }
+        { name: 'PriceRunner', searchUrl: (q) => `https://www.pricerunner.com/results?q=${encodeURIComponent(q)}`, priceSelector: 'a[href*="/pl/"] span', waitSelector: 'a[href*="/pl/"]' }
     ],
     'EUR': [
         { name: 'Amazon', searchUrl: (q) => `https://www.amazon.de/s?k=${encodeURIComponent(q)}`, priceSelector: '.a-price .a-offscreen, .a-price-whole', waitSelector: '[data-component-type="s-search-result"]' },

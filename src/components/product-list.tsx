@@ -133,9 +133,13 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
 
     if (loading) {
         return (
-            <Card className="bg-[#1A1A1A] border-[#2A2A2A]">
-                <CardContent className="p-8 flex justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF9EB5]"></div>
+            <Card className="glass-card border-[rgba(255,255,255,0.1)]">
+                <CardContent className="p-12 flex flex-col items-center gap-4">
+                    <div className="relative">
+                        <div className="animate-spin rounded-full h-12 w-12 border-4 border-transparent border-t-[#FF9EB5] border-r-[#B3688A]"></div>
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[#FF9EB5] to-[#794A63] opacity-20 blur-xl animate-pulse"></div>
+                    </div>
+                    <p className="text-[#9CA3AF] text-sm">Loading your products...</p>
                 </CardContent>
             </Card>
         )
@@ -143,90 +147,99 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
 
     if (products.length === 0) {
         return (
-            <Card className="bg-[#1A1A1A] border-[#2A2A2A]">
-                <CardHeader>
-                    <CardTitle className="text-[#EDEDED]">Your Products</CardTitle>
+            <Card className="glass-card border-[rgba(255,255,255,0.1)] overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#FF9EB5]/5 via-transparent to-[#794A63]/5"></div>
+                <CardHeader className="relative z-10">
+                    <CardTitle className="text-[#EDEDED] text-2xl font-bold">Your Products</CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <p className="text-center text-[#9CA3AF] py-8">
-                        No products yet. Add your first product to start tracking!
-                    </p>
+                <CardContent className="relative z-10">
+                    <div className="text-center py-12 space-y-4">
+                        <div className="w-24 h-24 mx-auto rounded-full bg-gradient-to-br from-[#FF9EB5]/20 to-[#794A63]/20 flex items-center justify-center text-5xl">
+                            🛍️
+                        </div>
+                        <p className="text-[#9CA3AF] text-lg">
+                            No products yet. Add your first product to start tracking!
+                        </p>
+                    </div>
                 </CardContent>
             </Card>
         )
     }
 
     return (
-        <Card className="bg-[#1A1A1A] border-[#2A2A2A]">
-            <CardHeader>
-                <CardTitle className="text-[#EDEDED]">Your Products ({products.length})</CardTitle>
+        <Card className="glass-card border-[rgba(255,255,255,0.1)] overflow-hidden">
+            <CardHeader className="border-b border-[rgba(255,255,255,0.05)]">
+                <CardTitle className="text-[#EDEDED] text-2xl font-bold flex items-center gap-3">
+                    <span>Your Products</span>
+                    <Badge className="bg-gradient-to-r from-[#FF9EB5] to-[#B3688A] text-black font-bold px-3 py-1">
+                        {products.length}
+                    </Badge>
+                </CardTitle>
             </CardHeader>
-            <CardContent>
-                <div className="space-y-4">
-                    {products.map((product) => (
+            <CardContent className="p-6">
+                <div className="space-y-3">
+                    {products.map((product, index) => (
                         <div
                             key={product.id}
-                            className="flex items-center justify-between p-4 rounded-lg bg-[#0A0A0A] border border-[#2A2A2A] hover:border-[#FF9EB5] transition-colors cursor-pointer"
+                            className="group relative overflow-hidden p-5 rounded-2xl glass-card border-[rgba(255,255,255,0.08)] hover:border-[#FF9EB5]/40 transition-all cursor-pointer hover:shadow-xl hover:shadow-[#FF9EB5]/10 animate-slide-up"
+                            style={{ animationDelay: `${index * 0.05}s` }}
                             onClick={() => onProductSelect?.(product)}
                         >
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 overflow-hidden">
-                                    <div className="text-sm font-semibold group-hover:text-[#FF9EB5] transition-colors flex items-center gap-2 text-[#EDEDED] line-clamp-2 leading-snug">
-                                        {(product.status === 'scraping' || product.status === 'queued') && <Loader2 className="w-4 h-4 text-[#FF9EB5] animate-spin shrink-0" />}
-                                        {product.status === 'failed' && <AlertCircle className="w-4 h-4 text-orange-400 shrink-0" />}
-                                        <span className="break-words">{product.name}</span>
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF9EB5]/5 rounded-full blur-2xl transform translate-x-16 -translate-y-16 group-hover:scale-150 transition-transform duration-500"></div>
+
+                            <div className="relative z-10 flex items-center justify-between gap-4">
+                                <div className="flex-1 min-w-0 space-y-2">
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <div className="text-base font-bold group-hover:text-[#FF9EB5] transition-colors flex items-center gap-2 text-[#EDEDED] line-clamp-2 leading-snug">
+                                            {(product.status === 'scraping' || product.status === 'queued') && <Loader2 className="w-4 h-4 text-[#FF9EB5] animate-spin shrink-0" />}
+                                            {product.status === 'failed' && <AlertCircle className="w-4 h-4 text-orange-400 shrink-0" />}
+                                            <span className="break-words">{product.name}</span>
+                                        </div>
+                                        {(product.status === 'scraping' || product.status === 'queued') && (
+                                            <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-[10px] py-0.5 px-2 shimmer">
+                                                PROCESSING
+                                            </Badge>
+                                        )}
                                     </div>
-                                    {(product.status === 'scraping' || product.status === 'queued') && (
-                                        <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-[10px] py-0 px-1">
-                                            QUEUED
-                                        </Badge>
-                                    )}
+                                    <div className="flex items-center gap-3 text-xs text-[#6B7280]">
+                                        <span>Added {formatDate(product.created_at)}</span>
+                                        {product.url && (
+                                            <>
+                                                <span>•</span>
+                                                <a
+                                                    href={product.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-[#FF9EB5] hover:underline flex items-center gap-1"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    Visit Store →
+                                                </a>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
-                                <p className="text-sm text-[#9CA3AF] mt-1">
-                                    Added {formatDate(product.created_at)}
-                                    {product.url && (
-                                        <a
-                                            href={product.url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="ml-2 text-[#FF9EB5] hover:underline"
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            View →
-                                        </a>
-                                    )}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-4 shrink-0 px-2 ml-4 border-l border-[#2A2A2A]">
-                                <div className="text-right min-w-[80px]">
-                                    <p className="text-xl font-bold text-[#FF9EB5]">
-                                        {formatCurrency(product.current_price, product.currency)}
-                                    </p>
+                                <div className="flex items-center gap-3 shrink-0 pl-4 border-l border-[rgba(255,255,255,0.08)]">
+                                    <div className="text-right">
+                                        <p className="text-xs text-[#6B7280] mb-1">Current Price</p>
+                                        <p className="text-2xl font-black text-gradient tracking-tight">
+                                            {formatCurrency(product.current_price, product.currency)}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            deleteProduct(product.id)
+                                        }}
+                                        className="text-red-400/60 hover:text-red-400 hover:bg-red-400/10 h-9 w-9 p-0"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                    </Button>
                                 </div>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        onProductSelect?.(product)
-                                    }}
-                                    className="border-[#FF9EB5]/30 text-[#FF9EB5] hover:bg-[#FF9EB5]/10 h-8 px-3 text-xs"
-                                >
-                                    Compare
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => {
-                                        e.stopPropagation()
-                                        deleteProduct(product.id)
-                                    }}
-                                    className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                </Button>
                             </div>
                         </div>
                     ))}

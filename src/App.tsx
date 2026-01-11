@@ -23,22 +23,30 @@ function LoginPage() {
   const { signInWithGitHub, signInWithGoogle } = useAuth()
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0A0A0A] p-4">
-      <Card className="w-full max-w-md bg-[#1A1A1A] border-[#2A2A2A]">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold text-[#EDEDED]">
-            <span className="bg-gradient-to-r from-[#794A63] via-[#B3688A] to-[#FF9EB5] bg-clip-text text-transparent">
-              PricePulse
-            </span>
+    <div className="min-h-screen flex items-center justify-center gradient-mesh grain-overlay p-4">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-[#FF9EB5]/10 rounded-full blur-3xl animate-float"></div>
+        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-[#794A63]/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '1s' }}></div>
+      </div>
+
+      <Card className="w-full max-w-md glass-card border-[rgba(255,255,255,0.1)] animate-slide-up relative z-10">
+        <CardHeader className="text-center space-y-4 pb-6">
+          <div className="inline-flex items-center justify-center w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br from-[#FF9EB5] to-[#794A63] p-0.5 glow-accent animate-pulse-glow">
+            <div className="w-full h-full rounded-2xl bg-[#0A0A0A] flex items-center justify-center">
+              <span className="text-4xl">💰</span>
+            </div>
+          </div>
+          <CardTitle className="text-4xl font-bold tracking-tight">
+            <span className="text-gradient">PricePulse</span>
           </CardTitle>
-          <CardDescription className="text-[#9CA3AF]">
-            Track product prices and get notified when they drop
+          <CardDescription className="text-[#9CA3AF] text-base">
+            Track product prices across the web and never miss a deal
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3 pt-2">
           <Button
             onClick={signInWithGitHub}
-            className="w-full bg-[#24292e] hover:bg-[#2f363d] text-white"
+            className="w-full bg-[#24292e] hover:bg-[#2f363d] text-white h-12 text-base font-medium transition-all hover:scale-[1.02] hover:shadow-lg"
           >
             <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
               <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
@@ -48,7 +56,7 @@ function LoginPage() {
           <Button
             onClick={signInWithGoogle}
             variant="outline"
-            className="w-full border-[#3A3A3A] bg-transparent hover:bg-[#2A2A2A] text-[#EDEDED]"
+            className="w-full border-[rgba(255,255,255,0.1)] bg-transparent hover:bg-[rgba(255,255,255,0.05)] text-[#EDEDED] h-12 text-base font-medium transition-all hover:scale-[1.02]"
           >
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -133,20 +141,20 @@ function Dashboard() {
   const displayName = profile.username || randomName
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A]">
+    <div className="min-h-screen gradient-mesh grain-overlay">
       {/* Header */}
-      <header className="border-b border-[#2A2A2A] bg-[#0A0A0A]/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+      <header className="border-b border-[rgba(255,255,255,0.08)] glass-card sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <h1 className="text-xl font-bold bg-gradient-to-r from-[#794A63] via-[#B3688A] to-[#FF9EB5] bg-clip-text text-transparent">
-              PricePulse
+            <h1 className="text-2xl font-bold tracking-tight">
+              <span className="text-gradient">PricePulse</span>
             </h1>
             <Button
               onClick={() => setInputOpen(true)}
-              className="hidden sm:flex items-center gap-2 bg-[#FF9EB5] hover:bg-[#B3688A] text-black font-semibold h-9 px-4 rounded-full"
+              className="hidden sm:flex items-center gap-2 btn-premium text-black font-semibold h-10 px-5 rounded-full shadow-lg"
             >
               <PlusCircle className="w-4 h-4" />
-              Add Product
+              Track New Product
             </Button>
           </div>
 
@@ -155,20 +163,20 @@ function Dashboard() {
               onClick={() => setInputOpen(true)}
               variant="outline"
               size="icon"
-              className="sm:hidden border-[#3A3A3A] bg-transparent text-[#FF9EB5]"
+              className="sm:hidden border-[rgba(255,158,181,0.3)] bg-transparent text-[#FF9EB5] hover:bg-[#FF9EB5]/10"
             >
               <PlusCircle className="w-5 h-5" />
             </Button>
 
-            <div className="flex items-center gap-2 pr-2 border-r border-[#2A2A2A]">
+            <div className="flex items-center gap-3 pr-3 border-r border-[rgba(255,255,255,0.08)]">
               {profile.avatar_url ? (
                 <img
                   src={profile.avatar_url}
                   alt="Avatar"
-                  className="w-8 h-8 rounded-full object-cover border border-[#FF9EB5]"
+                  className="w-9 h-9 rounded-full object-cover ring-2 ring-[#FF9EB5] ring-offset-2 ring-offset-[#0A0A0A]"
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#794A63] to-[#FF9EB5] flex items-center justify-center text-sm font-bold text-white uppercase">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#794A63] to-[#FF9EB5] flex items-center justify-center text-sm font-bold text-white uppercase shadow-lg">
                   {displayName[0]}
                 </div>
               )}
@@ -180,7 +188,7 @@ function Dashboard() {
               variant="ghost"
               size="sm"
               onClick={signOut}
-              className="text-[#9CA3AF] hover:text-[#EDEDED] hover:bg-[#2A2A2A]"
+              className="text-[#9CA3AF] hover:text-[#EDEDED] hover:bg-[rgba(255,255,255,0.05)]"
             >
               Sign Out
             </Button>
@@ -191,51 +199,73 @@ function Dashboard() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <Tabs defaultValue="dashboard" className="w-full">
-          {/* Fixed Tab Styling - Better contrast for inactive tabs */}
-          <TabsList className="bg-[#1A1A1A] border border-[#2A2A2A]">
+          <TabsList className="glass-card border-[rgba(255,255,255,0.1)] p-1.5">
             <TabsTrigger
               value="dashboard"
-              className="text-[#9CA3AF] data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black"
+              className="text-[#9CA3AF] data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#FF9EB5] data-[state=active]:to-[#B3688A] data-[state=active]:text-black font-medium transition-all data-[state=active]:shadow-lg"
             >
               Dashboard
             </TabsTrigger>
             <TabsTrigger
               value="products"
-              className="text-[#9CA3AF] data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black"
+              className="text-[#9CA3AF] data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#FF9EB5] data-[state=active]:to-[#B3688A] data-[state=active]:text-black font-medium transition-all data-[state=active]:shadow-lg"
             >
               Products
             </TabsTrigger>
             <TabsTrigger
               value="settings"
-              className="text-[#9CA3AF] data-[state=active]:bg-[#FF9EB5] data-[state=active]:text-black"
+              className="text-[#9CA3AF] data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#FF9EB5] data-[state=active]:to-[#B3688A] data-[state=active]:text-black font-medium transition-all data-[state=active]:shadow-lg"
             >
               Settings
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="dashboard" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card className="bg-[#1A1A1A] border-[#2A2A2A]">
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-[#9CA3AF]">Total Products</CardDescription>
-                  <CardTitle className="text-3xl text-[#EDEDED]">{stats.total}</CardTitle>
+          <TabsContent value="dashboard" className="mt-8 space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <Card className="glass-card border-[rgba(255,255,255,0.1)] overflow-hidden group hover:border-[#FF9EB5]/30 transition-all hover:shadow-xl hover:shadow-[#FF9EB5]/10 animate-slide-up stagger-1">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF9EB5]/5 rounded-full blur-2xl transform translate-x-16 -translate-y-16 group-hover:scale-150 transition-transform duration-500"></div>
+                <CardHeader className="pb-3 relative z-10">
+                  <CardDescription className="text-[#9CA3AF] text-xs font-semibold uppercase tracking-wider">Total Products</CardDescription>
+                  <CardTitle className="text-5xl font-black text-[#EDEDED] stat-value tracking-tight">{stats.total}</CardTitle>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF9EB5] to-[#B3688A] flex items-center justify-center text-sm">
+                      📦
+                    </div>
+                    <span className="text-xs text-[#6B7280]">Being tracked</span>
+                  </div>
                 </CardHeader>
               </Card>
-              <Card className="bg-[#1A1A1A] border-[#2A2A2A]">
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-[#9CA3AF]">Price Drops</CardDescription>
-                  <CardTitle className="text-3xl text-green-400">{stats.drops}</CardTitle>
+
+              <Card className="glass-card border-[rgba(255,255,255,0.1)] overflow-hidden group hover:border-green-400/30 transition-all hover:shadow-xl hover:shadow-green-400/10 animate-slide-up stagger-2">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-green-400/5 rounded-full blur-2xl transform translate-x-16 -translate-y-16 group-hover:scale-150 transition-transform duration-500"></div>
+                <CardHeader className="pb-3 relative z-10">
+                  <CardDescription className="text-[#9CA3AF] text-xs font-semibold uppercase tracking-wider">Price Drops</CardDescription>
+                  <CardTitle className="text-5xl font-black text-green-400 stat-value tracking-tight">{stats.drops}</CardTitle>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-sm">
+                      📉
+                    </div>
+                    <span className="text-xs text-[#6B7280]">This month</span>
+                  </div>
                 </CardHeader>
               </Card>
-              <Card className="bg-[#1A1A1A] border-[#2A2A2A]">
-                <CardHeader className="pb-2">
-                  <CardDescription className="text-[#9CA3AF]">Total Savings</CardDescription>
-                  <CardTitle className="text-3xl text-[#FF9EB5]">${stats.savings.toFixed(2)}</CardTitle>
+
+              <Card className="glass-card border-[rgba(255,255,255,0.1)] overflow-hidden group hover:border-[#FF9EB5]/30 transition-all hover:shadow-xl hover:shadow-[#FF9EB5]/10 animate-slide-up stagger-3">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF9EB5]/5 rounded-full blur-2xl transform translate-x-16 -translate-y-16 group-hover:scale-150 transition-transform duration-500"></div>
+                <CardHeader className="pb-3 relative z-10">
+                  <CardDescription className="text-[#9CA3AF] text-xs font-semibold uppercase tracking-wider">Total Savings</CardDescription>
+                  <CardTitle className="text-5xl font-black text-gradient stat-value tracking-tight">${stats.savings.toFixed(2)}</CardTitle>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#FF9EB5] to-[#794A63] flex items-center justify-center text-sm">
+                      💰
+                    </div>
+                    <span className="text-xs text-[#6B7280]">All time</span>
+                  </div>
                 </CardHeader>
               </Card>
             </div>
 
-            <div className="mt-6">
+            <div className="animate-slide-up stagger-4">
               <ProductList
                 refreshTrigger={refreshTrigger}
                 onProductSelect={handleProductSelect}
@@ -279,8 +309,14 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0A0A0A]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF9EB5]"></div>
+      <div className="min-h-screen flex items-center justify-center gradient-mesh grain-overlay">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-transparent border-t-[#FF9EB5] border-r-[#B3688A]"></div>
+            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-[#FF9EB5] to-[#794A63] opacity-20 blur-xl animate-pulse"></div>
+          </div>
+          <p className="text-[#9CA3AF] text-sm font-medium">Loading PricePulse...</p>
+        </div>
       </div>
     )
   }
