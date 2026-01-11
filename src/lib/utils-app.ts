@@ -42,3 +42,33 @@ export function extractProductNameFromUrl(url: string): string | null {
         return null
     }
 }
+
+/**
+ * Format a price with currency symbol
+ */
+export function formatCurrency(price: number | null, currency: string): string {
+    if (price === null) return 'N/A'
+    const symbols: Record<string, string> = {
+        USD: '$',
+        EUR: '€',
+        GBP: '£',
+        JPY: '¥',
+        CAD: 'C$',
+        AUD: 'A$'
+    }
+    return `${symbols[currency] || '$'}${price.toFixed(2)}`
+}
+
+/**
+ * Format a date string into a readable format
+ */
+export function formatDate(dateString: string): string {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    })
+}

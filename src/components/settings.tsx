@@ -91,6 +91,10 @@ export function Settings({ onProfileUpdate }: SettingsProps) {
             return
         }
 
+        // Add timeout using AbortController
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+
         try {
             const response = await fetch(discordWebhook, {
                 method: 'POST',
@@ -102,16 +106,24 @@ export function Settings({ onProfileUpdate }: SettingsProps) {
                         color: 0xFF9EB5,
                         timestamp: new Date().toISOString()
                     }]
-                })
+                }),
+                signal: controller.signal
             })
+
+            clearTimeout(timeoutId)
 
             if (response.ok) {
                 toast.success('Test notification sent!')
             } else {
                 toast.error('Webhook test failed')
             }
-        } catch (_err) {
-            toast.error('Failed to send test notification')
+        } catch (err) {
+            clearTimeout(timeoutId)
+            if ((err as Error).name === 'AbortError') {
+                toast.error('Webhook test timed out after 10 seconds')
+            } else {
+                toast.error('Failed to send test notification')
+            }
         }
     }
 

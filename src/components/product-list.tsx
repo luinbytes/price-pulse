@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth'
 import { toast } from 'sonner'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import type { Product } from '@/lib/database.types'
+import { formatCurrency, formatDate } from '@/lib/utils-app'
 
 interface ProductListProps {
     refreshTrigger?: number
@@ -128,24 +129,6 @@ export function ProductList({ refreshTrigger, onProductSelect }: ProductListProp
             toast.error('Failed to delete product')
             console.error(err)
         }
-    }
-
-    const formatCurrency = (price: number | null, currency: string) => {
-        if (price === null) return 'N/A'
-
-        const symbols: Record<string, string> = {
-            USD: '$', EUR: '€', GBP: '£', JPY: '¥', CAD: 'C$', AUD: 'A$'
-        }
-
-        return `${symbols[currency] || '$'}${price.toFixed(2)}`
-    }
-
-    const formatDate = (date: string) => {
-        return new Date(date).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        })
     }
 
     if (loading) {

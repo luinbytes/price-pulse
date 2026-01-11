@@ -11,6 +11,7 @@ import { LineChart, Line, CartesianGrid, Tooltip, ResponsiveContainer } from 're
 import { Loader2, ExternalLink, Clock, TrendingDown } from 'lucide-react'
 import type { Product } from '@/lib/database.types'
 import { formatDistanceToNow } from 'date-fns'
+import { formatCurrency, formatDate } from '@/lib/utils-app'
 
 interface ComparisonPrice {
     id: string
@@ -20,6 +21,8 @@ interface ComparisonPrice {
     currency: string
     last_checked: string
     is_available: boolean
+    is_approximate_match?: boolean
+    match_score?: number
 }
 
 interface ProductDetailProps {
@@ -74,8 +77,9 @@ export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: Pr
 
             if (error) throw error
             setPriceHistory(data || [])
-        } catch {
-            console.error('Failed to load price history')
+        } catch (err) {
+            console.error('Failed to load price history:', err)
+            toast.error('Failed to load price history')
         } finally {
             setLoading(false)
         }
@@ -157,6 +161,7 @@ export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: Pr
             }
         } catch (err) {
             console.error('Failed to fetch comparison prices:', err)
+            toast.error('Failed to load comparison prices')
         } finally {
             setComparisonLoading(false)
         }
@@ -209,13 +214,22 @@ export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: Pr
                 supabase.removeChannel(channel)
             }
         }
-    }, [product, isEditing, fetchPriceHistory, fetchComparisonPrices, onUpdate])
+        // fetchPriceHistory and fetchComparisonPrices only depend on 'product'
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [product, open, isEditing, onUpdate])
 
     const handleUpdate = async () => {
         if (!product) return
 
         try {
             const numPrice = parseFloat(editedPrice.replace(/[^0-9.]/g, ''))
+
+            // Validate price is a valid number
+            if (isNaN(numPrice) || numPrice < 0) {
+                toast.error('Please enter a valid price')
+                return
+            }
+
             const { error } = await supabase
                 .from('products')
                 .update({
@@ -263,22 +277,15 @@ export function ProductDetail({ product, open, onClose, onDelete, onUpdate }: Pr
         }
     }
 
-    const formatCurrency = (price: number | null, currency: string) => {
-        if (price === null) return 'N/A'
-        const symbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', JPY: '¥', CAD: 'C$', AUD: 'A$' }
-        return `${symbols[currency] || '$'}${price.toFixed(2)}`
-    }
-
-    const formatDate = (date: string) => {
-        return new Date(date).toLocaleDateString('en-US', {
-            month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
-        })
-    }
 
     const getPriceChangeInfo = () => {
         if (priceHistory.length < 2) return null
         const latest = priceHistory[0].price
         const previous = priceHistory[1].price
+
+        // Guard against division by zero
+        if (previous === 0) return null
+
         const change = latest - previous
         const percentChange = ((change / previous) * 100).toFixed(1)
         return { change, percentChange, isDown: change < 0 }
